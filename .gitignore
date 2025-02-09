@@ -1,3 +1,4 @@
+## Auto-generated ignores
 # Prerequisites
 *.d
 
@@ -30,3 +31,17 @@
 *.exe
 *.out
 *.app
+
+# Devenv
+.devenv*
+devenv.local.nix
+
+# direnv
+.direnv
+
+# pre-commit
+.pre-commit-config.yaml
+
+## Custom ignores
+**/build/*
+
