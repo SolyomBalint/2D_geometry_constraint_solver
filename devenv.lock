@@ -16,22 +16,22 @@
         "type": "github"
       }
     },
-    "devenv_nixpkgs": {
+    "flake-compat": {
+      "flake": false,
       "locked": {
-        "lastModified": 1733477122,
-        "owner": "cachix",
-        "repo": "devenv-nixpkgs",
-        "rev": "7bd9e84d0452f6d2e63b6e6da29fe73fac951857",
+        "lastModified": 1733328505,
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "rev": "ff81ac966bb2cae68946d5ed5fc4994f96d0ffec",
         "type": "github"
       },
       "original": {
-        "owner": "cachix",
-        "ref": "rolling",
-        "repo": "devenv-nixpkgs",
+        "owner": "edolstra",
+        "repo": "flake-compat",
         "type": "github"
       }
     },
-    "flake-compat": {
+    "flake-compat_2": {
       "flake": false,
       "locked": {
         "lastModified": 1733328505,
@@ -66,6 +66,18 @@
         "type": "github"
       }
     },
+    "nixos_2025_01_22": {
+      "locked": {
+        "lastModified": 1737454655,
+        "narHash": "sha256-HukcSGUZc/YzO6DMkA6noUrav44lIo1MwQaVog5kVT0=",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/028048884dc9517e548703beb24a11408cc51402.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/028048884dc9517e548703beb24a11408cc51402.tar.gz"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1733477122,
@@ -81,9 +93,41 @@
         "type": "github"
       }
     },
-    "pre-commit-hooks": {
+    "nixpkgs-python": {
       "inputs": {
         "flake-compat": "flake-compat",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1733319315,
+        "owner": "cachix",
+        "repo": "nixpkgs-python",
+        "rev": "01263eeb28c09f143d59cd6b0b7c4cc8478efd48",
+        "type": "github"
+      },
+      "original": {
+        "owner": "cachix",
+        "repo": "nixpkgs-python",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2025_01_22": {
+      "locked": {
+        "lastModified": 1737545071,
+        "narHash": "sha256-j4HeaLw1LZxkCvuOxdO1xTnPYLSOQuzOjGEuCK80X2w=",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/21808d22b1cda1898b71cf1a1beb524a97add2c4.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/21808d22b1cda1898b71cf1a1beb524a97add2c4.tar.gz"
+      }
+    },
+    "pre-commit-hooks": {
+      "inputs": {
+        "flake-compat": "flake-compat_2",
         "gitignore": "gitignore",
         "nixpkgs": [
           "nixpkgs"
@@ -105,8 +149,10 @@
     "root": {
       "inputs": {
         "devenv": "devenv",
-        "devenv_nixpkgs": "devenv_nixpkgs",
+        "nixos_2025_01_22": "nixos_2025_01_22",
         "nixpkgs": "nixpkgs",
+        "nixpkgs-python": "nixpkgs-python",
+        "nixpkgs_2025_01_22": "nixpkgs_2025_01_22",
         "pre-commit-hooks": "pre-commit-hooks",
         "stable_latest_nixpkgs": "stable_latest_nixpkgs",
         "unstable_nixkpgs": "unstable_nixkpgs"

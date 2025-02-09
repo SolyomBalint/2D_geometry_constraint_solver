@@ -1,7 +1,17 @@
 inputs:
-  devenv_nixpkgs:
-    url: github:cachix/devenv-nixpkgs/rolling
-  stable_latest_nixpkgs: 
+  stable_latest_nixpkgs:
     url: github:NixOS/nixpkgs/nixos-24.11
   unstable_nixkpgs:
     url: github:NixOS/nixpkgs/nixos-unstable
+  nixpkgs-python:
+    url: github:cachix/nixpkgs-python
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
+  nixpkgs:
+    url: github:cachix/devenv-nixpkgs/rolling
+  nixos_2025_01_22:
+    url: https://github.com/NixOS/nixpkgs/archive/028048884dc9517e548703beb24a11408cc51402.tar.gz
+  nixpkgs_2025_01_22:
+    url: https://github.com/NixOS/nixpkgs/archive/21808d22b1cda1898b71cf1a1beb524a97add2c4.tar.gz
+
