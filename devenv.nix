@@ -7,7 +7,7 @@
 }:
 let
   # pkgs_stable = import inputs.stable_latest_nixpkgs { system = pkgs.stdenv.system; };
-  # pkgs_unstable = import inputs.unstable_nixkpgs { system = pkgs.stdenv.system; };
+  pkgs_unstable = import inputs.unstable_nixkpgs { system = pkgs.stdenv.system; };
   nixos_2025_01_22 = import inputs.nixos_2025_01_22 { system = pkgs.stdenv.system; };
   nixpkgs_2025_01_22 = import inputs.nixpkgs_2025_01_22 { system = pkgs.stdenv.system; };
 in
@@ -25,13 +25,26 @@ in
     # Prefer nixpkgs to keep it usable on other platforms as well
     nixos_2025_01_22.cmake
 
-    pkgs.doxygen
-    pkgs.valgrind
+    pkgs_unstable.doxygen
+    pkgs_unstable.valgrind
+
+    # Build deps
+    pkgs_unstable.imgui
+    pkgs_unstable.libGL
+    pkgs_unstable.glfw
+    pkgs_unstable.pkg-config
   ];
 
-  languages.python.enable = true;
-  languages.python.version = "3.13";
-  languages.python.venv.enable = true;
+  languages.python = {
+    enable = true;
+    version = "3.13";
+    venv = {
+      enable = true;
+      requirements = ''
+        gitpython
+      '';
+    };
+  };
 
   # Scripts
   enterShell = ''

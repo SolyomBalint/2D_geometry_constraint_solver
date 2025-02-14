@@ -45,3 +45,4 @@ devenv.local.nix
 ## Custom ignores
 **/build/*
 
+.cache
