@@ -17,6 +17,7 @@ in
 
   # packages
   packages = [
+    ## Build tools
     nixpkgs_2025_01_22.gcc
     nixpkgs_2025_01_22.gnumake
     nixpkgs_2025_01_22.ninja
@@ -25,12 +26,13 @@ in
     # Prefer nixpkgs to keep it usable on other platforms as well
     nixos_2025_01_22.cmake
 
+    ## Tools
     pkgs_unstable.doxygen
     pkgs_unstable.valgrind
+    pkgs_unstable.virtualglLib
 
-    # Build deps
+    ## Build deps
     pkgs_unstable.imgui
-    pkgs_unstable.libGL
     pkgs_unstable.glfw
     pkgs_unstable.pkg-config
   ];
