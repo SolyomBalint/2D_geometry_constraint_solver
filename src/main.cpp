@@ -1,9 +1,16 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "imnodes.h"
+
+#include "graph_render.hpp"
+
 #include <stdio.h>
 #define GL_SILENCE_DEPRECATION
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
+
+constexpr const int WINDOW_HEIGHT = 500;
+constexpr const int WINDOW_WIDTH = 500;
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -24,7 +31,7 @@ int main(int, char**)
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
 
     // Create window with graphics context
-    GLFWwindow* window = glfwCreateWindow(200, 200, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
     if (window == nullptr)
         return 1;
     glfwMakeContextCurrent(window);
@@ -33,9 +40,11 @@ int main(int, char**)
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    ImNodes::CreateContext(); // TODO this is kind  of spaghetti
+    ImGuiIO& io = ImGui::GetIO();
+    (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -46,11 +55,11 @@ int main(int, char**)
 
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    while (!glfwWindowShouldClose(window))
-    {
+    Rendering::Graph graph;
+
+    while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
-        if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0)
-        {
+        if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0) {
             ImGui_ImplGlfw_Sleep(10);
             continue;
         }
@@ -59,7 +68,11 @@ int main(int, char**)
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+        //-------------------------------------------Custom Code-------------------------------------------------------
 
+        graph.RenderGraph();
+
+        //-------------------------------------------Custom Code-------------------------------------------------------
         // Rendering
         ImGui::Render();
         int display_w, display_h;
@@ -74,6 +87,7 @@ int main(int, char**)
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
+    ImNodes::DestroyContext();
     ImGui::DestroyContext();
 
     glfwDestroyWindow(window);
