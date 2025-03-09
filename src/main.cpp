@@ -3,37 +3,69 @@
 #include "imgui_impl_opengl3.h"
 #include "imnodes.h"
 
-#include "graph_render.hpp"
+// General STD/STL headers
+#include <format>
 
-#include <stdio.h>
+// Custom headers
+#include <rendering/graph_render.hpp>
+
+// Thirdparty headers not needed for rendering
+#include <argparse/argparse.hpp>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+
 #define GL_SILENCE_DEPRECATION
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
 constexpr const int WINDOW_HEIGHT = 500;
 constexpr const int WINDOW_WIDTH = 500;
 
-static void glfw_error_callback(int error, const char* description)
+auto mainLogger = spdlog::stdout_color_mt("MAIN");
+
+int ConvertLogLevel(const std::string& input)
 {
-    fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+    if (input == "TRACE") {
+        return spdlog::level::trace;
+    } else if (input == "DEBUG") {
+        return spdlog::level::debug;
+    } else if (input == "INFO") {
+        return spdlog::level::info;
+    } else if (input == "WARN") {
+        return spdlog::level::warn;
+    } else if (input == "ERROR") {
+        return spdlog::level::err;
+    } else if (input == "CRITICAL") {
+        return spdlog::level::critical;
+    } else {
+        return -1;
+    }
 }
 
-// Main code
-int main(int, char**)
+static void glfw_error_callback(int error, const char* description)
 {
+    mainLogger->error("GLFW Error %d: %s\n", error, description);
+}
+
+GLFWwindow* SetupWindow()
+{
+
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
-        return 1;
+        std::exit(-1);
 
     // GL ES 3.0 + GLSL 300 es (WebGL 2.0)
     const char* glsl_version = "#version 300 es";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+    mainLogger->debug("Correct glfw version is set");
 
     // Create window with graphics context
     GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
-    if (window == nullptr)
-        return 1;
+    if (window == nullptr) {
+        mainLogger->error("GLFW window couldn't be initialized. exiting.");
+        std::exit(-1);
+    }
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
 
@@ -53,8 +85,25 @@ int main(int, char**)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    mainLogger->info("Window setup complete");
 
+    return window;
+}
+
+void CleanUp(GLFWwindow* window)
+{
+    // Cleanup
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImNodes::DestroyContext();
+    ImGui::DestroyContext();
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
+}
+
+void GuiLoop(GLFWwindow* window)
+{
     Rendering::Graph graph;
 
     while (!glfwWindowShouldClose(window)) {
@@ -78,20 +127,58 @@ int main(int, char**)
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
-        glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(window);
     }
-    // Cleanup
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImNodes::DestroyContext();
-    ImGui::DestroyContext();
+}
 
-    glfwDestroyWindow(window);
-    glfwTerminate();
+void InitParserArgumnets(argparse::ArgumentParser& argparser)
+{
+    argparser.add_argument("--log-level")
+        .help("Define the log-level of the program. Defuaults to INFO."
+              "Allowed values: [TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL]")
+        .default_value("INFO");
+}
+
+void ParseArguments(argparse::ArgumentParser& argparser, int argc, char* argv[])
+{
+    try {
+        argparser.parse_args(argc, argv);
+    } catch (const std::exception& err) {
+        std::cerr << err.what() << std::endl;
+        std::exit(-1);
+    }
+
+    {
+        auto inputLogLevel = argparser.get<std::string>("--log-level");
+        auto logLevel = ConvertLogLevel(inputLogLevel);
+
+        if (logLevel == -1) {
+            std::cerr << std::format("Invalid log level input: {}, "
+                                     "Allowed values: [TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL]",
+                inputLogLevel)
+                      << std::endl;
+            std::exit(-1);
+        }
+
+        // Sets GLOBAL log level
+        spdlog::set_level(static_cast<spdlog::level::level_enum>(logLevel));
+    }
+}
+
+int main(int argc, char* argv[])
+{
+    argparse::ArgumentParser argparser("2D Geometry Constraint Solver", "0.0.0");
+    InitParserArgumnets(argparser);
+    ParseArguments(argparser, argc, argv);
+
+    GLFWwindow* window = SetupWindow();
+
+    GuiLoop(window);
+
+    CleanUp(window);
 
     return 0;
 }

@@ -6,9 +6,9 @@
   ...
 }:
 let
+  pkgs_unstable = import inputs.unstable_nixkpgs { system = pkgs.stdenv.system; };
 in
 # pkgs_stable = import inputs.stable_latest_nixpkgs { system = pkgs.stdenv.system; };
-# pkgs_unstable = import inputs.unstable_nixkpgs { system = pkgs.stdenv.system; };
 # nixos_2025_01_22 = import inputs.nixos_2025_01_22 { system = pkgs.stdenv.system; };
 # nixpkgs_2025_01_22 = import inputs.nixpkgs_2025_01_22 { system = pkgs.stdenv.system; };
 {
@@ -18,35 +18,37 @@ in
   env.GREET = "Welcome to 2D geometry constraint solver development environment!";
 
   # packages
-  packages = [
+  packages = with pkgs_unstable; [
     ## Build tools
-    pkgs.gcc
-    pkgs.gnumake
-    pkgs.ninja
+    gcc
+    gnumake
+    ninja
     # This is built from another commit because the one on nixpkgs is faulty for flakes
     # Prefer nixpkgs to keep it usable on other platforms as well
-    pkgs.cmake
+    cmake
 
     ## Tools
-    pkgs.doxygen
-    pkgs.valgrind
-    pkgs.virtualglLib
+    doxygen
+    valgrind
+    virtualglLib
 
     ## Build deps
-    pkgs.imgui
-    pkgs.glfw
-    pkgs.pkg-config
-    pkgs.imnodes
+    imgui
+    glfw
+    pkg-config
+    imnodes
+    spdlog
+    argparse
   ];
 
-  languages.python = {
-    enable = true;
-    version = "3.13";
-    venv = {
-      enable = true;
-      requirements = '''';
-    };
-  };
+  # languages.python = {
+  #   enable = true;
+  #   version = "3.13";
+  #   venv = {
+  #     enable = true;
+  #     requirements = '''';
+  #   };
+  # };
 
   # Scripts
   enterShell = ''
