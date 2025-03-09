@@ -46,3 +46,4 @@ devenv.local.nix
 **/build/*
 
 .cache
+examples/*
