@@ -38,6 +38,7 @@ in
     pkg-config
     imnodes
     spdlog
+    libuuid.dev
     argparse
   ];
 

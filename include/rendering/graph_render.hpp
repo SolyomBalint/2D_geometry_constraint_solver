@@ -10,6 +10,8 @@ namespace Rendering {
 
 class Edge {
 private:
+private:
+    // Inline so that out of class definition can be avoided
     inline static int32_t m_availableId = 1;
     const int32_t m_id;
     const std::pair<int32_t, int32_t> m_directions;
