@@ -2,14 +2,10 @@
 #define GRAPH_HPP
 
 #include <vector>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 
 namespace MathUtils {
-
-/*static const auto graphLogger = spdlog::stdout_color_mt("GRAPH");*/
 
 class Node;
 
@@ -42,6 +38,7 @@ struct Node {
         , m_uuid(boost::uuids::random_generator()())
     {
     }
+
     Node(const Node&) = default;
     Node(Node&&) = default;
     Node& operator=(const Node&) = default;
@@ -54,7 +51,7 @@ struct Node {
 
     /**
      * Returns hash value based on uuid
-    */
+     */
     std::size_t operator()(MathUtils::Node const& node) const noexcept
     {
         return std::hash<boost::uuids::uuid> {}(node.m_uuid);
@@ -79,6 +76,8 @@ public:
         , m_adjacencyList(inList)
     {
     }
+
+    const std::vector<Node>& getAdjList() const { return m_adjacencyList; }
 
 private:
     std::vector<Node> m_adjacencyList;
