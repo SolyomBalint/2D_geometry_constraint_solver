@@ -8,6 +8,7 @@
 
 // Custom headers
 #include <rendering/graph_render.hpp>
+#include <utils/graph.hpp>
 
 // Thirdparty headers not needed for rendering
 #include <argparse/argparse.hpp>
@@ -140,6 +141,9 @@ void InitParserArgumnets(argparse::ArgumentParser& argparser)
         .help("Define the log-level of the program. Defuaults to INFO."
               "Allowed values: [TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL]")
         .default_value("INFO");
+    argparser.add_argument("--gui")
+        .help("Whether to enable GUI when running the program, defaults to false")
+        .default_value(false);
 }
 
 void ParseArguments(argparse::ArgumentParser& argparser, int argc, char* argv[])
@@ -174,11 +178,47 @@ int main(int argc, char* argv[])
     InitParserArgumnets(argparser);
     ParseArguments(argparser, argc, argv);
 
-    GLFWwindow* window = SetupWindow();
+    MathUtils::Node node1;
+    MathUtils::Node node2;
+    MathUtils::Node node3;
+    MathUtils::Node node4;
+    MathUtils::Node node5;
 
-    GuiLoop(window);
+    node1.m_edges.emplace_back(node2);
+    node1.m_edges.emplace_back(node3);
 
-    CleanUp(window);
+    node2.m_edges.emplace_back(node1);
+    node2.m_edges.emplace_back(node3);
+
+    node3.m_edges.emplace_back(node1);
+    node3.m_edges.emplace_back(node2);
+    node3.m_edges.emplace_back(node4);
+    node3.m_edges.emplace_back(node5);
+
+    node4.m_edges.emplace_back(node5);
+    node4.m_edges.emplace_back(node3);
+
+    node5.m_edges.emplace_back(node4);
+    node5.m_edges.emplace_back(node3);
+
+    std::vector<MathUtils::Node> temp = { node1, node2, node3, node4, node5 };
+
+    auto testGraph = std::make_unique<MathUtils::UndirectedGraph>(temp);
+
+    auto cutVertices = testGraph->getCutVertices();
+    std::cout << "Cut vertices:" << std::endl;
+
+    for (auto& cutVertice : cutVertices)
+        std::cout << cutVertice.tempName << std::endl;
+
+    auto gui = argparser.get<bool>("--gui");
+    if (gui) {
+        GLFWwindow* window = SetupWindow();
+
+        GuiLoop(window);
+
+        CleanUp(window);
+    }
 
     return 0;
 }

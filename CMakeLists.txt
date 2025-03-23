@@ -15,13 +15,7 @@ find_package(imgui REQUIRED)
 find_package(imnodes REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(argparse REQUIRED)
-
-# NOTE that using find_package and pkg_check_modules this way is really not nice.
-# If there is time it would be better to do a following: first use find_package since
-# it is the `native` cmake supported solution, and if it doesn't work fallback to
-# PkgConfig
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(UUID REQUIRED uuid)
+find_package(Boost REQUIRED)
 
 # IMPORTANT NOTE: Currently this project outputs only one binary. There is no
 # modularization in respect to the logical modules via archives or shared
@@ -39,8 +33,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE ./include
             ${imnodes_INCLUDE_DIRS}
             ${spdlog_INCLUDE_DIRS}
             ${argparse_INCLUDE_DIRS}
-            ${UUID_INCLUDE_DIRS})
+            ${Boost_INCLUDE_DIRS})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog glfw imgui argparse::argparse
-                                        imnodes OpenGL::GL ${UUID_LIBRARIES})
-target_compile_options(${PROJECT_NAME} PRIVATE -Werror)
+                                        imnodes OpenGL::GL ${Boost_LIBRARIES})
+target_compile_options(${PROJECT_NAME} PRIVATE -Werror $<$<CONFIG:Debug>:-ggdb>)
