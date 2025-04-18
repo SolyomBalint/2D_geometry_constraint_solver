@@ -47,3 +47,7 @@ devenv.local.nix
 
 .cache
 examples/*
+
+.vscode/
+pyproject.toml
+examples/internal/*

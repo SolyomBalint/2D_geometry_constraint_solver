@@ -6,16 +6,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
-# Needed bu spdlog to compile
+# Needed by spdlog to compile
 set(CMAKE_POSITION_INDEPENDENT_CODE true)
 
-find_package(OpenGL REQUIRED)
-find_package(glfw3 REQUIRED)
-find_package(imgui REQUIRED)
-find_package(imnodes REQUIRED)
+message(STATUS "Setting CMAKE_DEVENV_PROFILE to $ENV{DEVENV_PROFILE}")
+set(CMAKE_DEVENV_PROFILE $ENV{DEVENV_PROFILE})
+
+configure_file(${CMAKE_CURRENT_LIST_DIR}/pyproject.toml.template ${CMAKE_CURRENT_LIST_DIR}/pyproject.toml)
+
 find_package(spdlog REQUIRED)
 find_package(argparse REQUIRED)
 find_package(Boost REQUIRED)
+find_package(Python3 COMPONENTS Development Interpreter REQUIRED)
 
 # IMPORTANT NOTE: Currently this project outputs only one binary. There is no
 # modularization in respect to the logical modules via archives or shared
@@ -23,18 +25,12 @@ find_package(Boost REQUIRED)
 # correct linking
 
 add_executable(${PROJECT_NAME}  src/main.cpp
-                                src/imgui_rendering/graph_render.cpp
                                 src/utils/graph.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ./include
-            ${OpenGL_INCLUDE_DIRS}
-            ${glfw3_INCLUDE_DIRS}
-            ${imgui_INCLUDE_DIRS}
-            ${imnodes_INCLUDE_DIRS}
             ${spdlog_INCLUDE_DIRS}
             ${argparse_INCLUDE_DIRS}
             ${Boost_INCLUDE_DIRS})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog glfw imgui argparse::argparse
-                                        imnodes OpenGL::GL ${Boost_LIBRARIES})
-target_compile_options(${PROJECT_NAME} PRIVATE -Werror $<$<CONFIG:Debug>:-ggdb>)
+target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog  argparse::argparse ${Boost_LIBRARIES} Python3::Python)
+target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:-ggdb>)

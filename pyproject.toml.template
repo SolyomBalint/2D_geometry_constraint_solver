@@ -1,0 +1,12 @@
+[tool.pyright]
+pythonVersion = "3.13"
+pythonPlatform = "Linux"
+extraPaths = [
+    "@CMAKE_DEVENV_PROFILE@/lib/python3.13/site-packages/gi/overrides"
+]
+
+[tool.mypy]
+python_version = "3.13"
+mypy_path = [
+    "@CMAKE_DEVENV_PROFILE@/lib/python3.13/site-packages/gi/overrides"
+]

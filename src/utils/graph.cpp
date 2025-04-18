@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <iostream>
 #include <unordered_map>
-#include <utils/graph.hpp>
+#include "graph.hpp"
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
@@ -61,7 +61,8 @@ void findCutVertices(std::unordered_map<Node, FindArticulationNodeMetaInfo, Node
         }
 
         // Note that parrent node is allowed to be nullptr
-        else if (const Node* parentPtr = parentMetaInfo.m_parent; parentPtr != nullptr && currentChildNode != *parentPtr) {
+        else if (const Node* parentPtr = parentMetaInfo.m_parent;
+            parentPtr != nullptr && currentChildNode != *parentPtr) {
             parentMetaInfo.low = std::min(parentMetaInfo.low, currentChildMetaInfo.m_discoveryTime);
         }
     }
