@@ -48,6 +48,10 @@ in
     glib
     gobject-introspection
     cairo
+
+    ### dearpygui deps it supports X11
+    xorg.libX11
+    libglvnd
   ];
 
   languages.python = {
@@ -56,7 +60,6 @@ in
     venv = {
       enable = true;
       requirements = ''
-        dearpygui
         nanobind
         scipy
         PyGObject
