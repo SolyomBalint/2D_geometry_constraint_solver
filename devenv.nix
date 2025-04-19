@@ -30,6 +30,7 @@ in
     doxygen
     valgrind
     virtualglLib
+    sass
 
     ## Build deps
     spdlog

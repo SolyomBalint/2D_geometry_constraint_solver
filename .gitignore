@@ -51,3 +51,5 @@ examples/*
 .vscode/
 pyproject.toml
 examples/internal/*
+
+**/__pycache__/*
