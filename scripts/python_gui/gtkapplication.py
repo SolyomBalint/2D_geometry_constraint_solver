@@ -41,7 +41,7 @@ class GeometricConstraintSolverApp(Gtk.Application):
             screen = Gdk.Screen.get_default()
             style_context = Gtk.StyleContext()
             style_context.add_provider_for_screen(screen, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-            print("Successfully loaded dark theme")
+            print("Successfully loaded theme")
         except Exception as e:
             print(f"Error loading CSS theme: {e}")
 

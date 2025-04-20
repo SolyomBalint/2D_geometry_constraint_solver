@@ -33,11 +33,12 @@ in
     sass
 
     ## Build deps
-    spdlog
-    argparse
-    boost.dev
+    spdlog # MIT licence
+    argparse # MIT licence
+    boost.dev # Boost software licence
     boost.out
 
+    ## Example gui dependencies
     (python313.withPackages (
       ps: with ps; [
         graph-tool
@@ -49,10 +50,6 @@ in
     glib
     gobject-introspection
     cairo
-
-    ### dearpygui deps it supports X11
-    xorg.libX11
-    libglvnd
   ];
 
   languages.python = {
@@ -62,6 +59,7 @@ in
       enable = true;
       requirements = ''
         nanobind
+
         scipy
         PyGObject
         numpy

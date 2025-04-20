@@ -2,14 +2,27 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-import math
-from enum import IntEnum
+import copy
+from enum import StrEnum
 
 import cairo
 from gi.repository import Gdk, Gio, Gtk
 
-from ..common import commondatastructs
+from ..common import commondatastructs as common
 from ..model import drawmodel
+
+
+class DrawingMethod(StrEnum):
+    POINT = "Point"
+    LINE = "Line"
+    CIRCLE = "Circle"
+
+    @classmethod
+    def get_enum_based_on_str(cls, inputMethod: str):
+        for method in DrawingMethod:
+            if method == inputMethod:
+                return method
+        raise ValueError("Non existent StrEnum input")
 
 
 class DrawingCanvasWidget(Gtk.DrawingArea):
@@ -17,7 +30,11 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
     def __init__(self):
         super(DrawingCanvasWidget, self).__init__()
 
-        self.point_buffer: list[drawmodel.CanvasCoord] = []
+        self.shape_buffer = [] # This will contain drawmodel.Drawable instances
+        self.current_colour: common.RgbColour = common.RgbColour(0, 0, 0)
+        self.current_width: float = 5
+        self.drawing_method: DrawingMethod = DrawingMethod.POINT  # Based on DrawingLayout combobox initialization
+        self.temp_start_point: bool = False
         self.connect("draw", self.on_draw)
 
         self.set_hexpand(True)
@@ -25,48 +42,65 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
         self.set_events(Gdk.EventMask.BUTTON_PRESS_MASK)  # Mouse events have to be enabled manually
         self.connect("button-press-event", self.on_button_press)
 
-    def on_draw(self, wid, cr):
-        cr.set_line_width(5)
-        cr.set_source_rgb(0, 0, 0)
+    def on_draw(self, wid, cr: cairo.Context):
 
-        for circle in self.point_buffer:
-            # Save the current state of the context
-            cr.save()
-
-            # Draw circle at the correct position without translation
-            cr.arc(circle.x, circle.y, 5, 0, 2 * math.pi)
-            cr.stroke_preserve()
-            cr.fill()
-
-            # Restore the context to its original state
-            cr.restore()
+        for shape in self.shape_buffer:
+            shape.on_draw(wid, cr)
 
     def on_button_press(self, w, e):
 
-        if e.type == Gdk.EventType.BUTTON_PRESS and e.button == commondatastructs.MouseButtonGtkId.LEFT_MOUSE_BUTTON:
+        if e.type == Gdk.EventType.BUTTON_PRESS and e.button == common.MouseButtonGtkId.LEFT_MOUSE_BUTTON:
 
-            self.point_buffer.append(drawmodel.CanvasCoord(e.x, e.y))
+            match self.drawing_method:
+                case DrawingMethod.POINT:
+                    self.shape_buffer.append(
+                        drawmodel.Point(e.x, e.y, copy.deepcopy(self.current_width), copy.deepcopy(self.current_colour))
+                    )
 
-            self.queue_draw()
+                    self.queue_draw()
+
+                case DrawingMethod.LINE:
+                    if not self.temp_start_point:
+                        self.temp_start_point = True
+                        self.shape_buffer.append(drawmodel.Point(e.x, e.y, copy.deepcopy(self.current_width),
+                                                                 copy.deepcopy(self.current_colour)))
+                    else:
+                        self.shape_buffer.append(
+                            drawmodel.Line(self.shape_buffer[-1],
+                                           drawmodel.Point(e.x, e.y, copy.deepcopy(self.current_width),
+                                                           copy.deepcopy(self.current_colour)),
+                                           copy.deepcopy(self.current_width), copy.deepcopy(self.current_colour))
+                        )
+                        self.shape_buffer.append(self.shape_buffer[-1].defining_point_two)
+
+                        self.temp_start_point = False
+
+                    self.queue_draw()
 
     def clear_canvas(self):
-        self.point_buffer.clear()
+        self.shape_buffer.clear()
         self.queue_draw()
 
+    def setDrawingMethod(self, stringRep: str):
+        self.drawing_method = DrawingMethod.get_enum_based_on_str(stringRep)
 
+
+# TODO circle, collosion detection
 class DrawingLayout(Gtk.Grid):
     def __init__(self):
         super().__init__()
         self.set_column_homogeneous(True)
         self.set_row_homogeneous(True)
 
+        self.drawing_area = DrawingCanvasWidget()
+
         list_box = Gtk.ListBox()
         list_box.set_selection_mode(Gtk.SelectionMode.NONE)
 
         draw_methods = [
-            "Point",
-            "Line",
-            "Circle",
+            DrawingMethod.POINT,
+            DrawingMethod.LINE,
+            DrawingMethod.CIRCLE,
         ]
         drawing_combo = Gtk.ComboBoxText()
         drawing_combo.set_entry_text_column(0)
@@ -82,9 +116,14 @@ class DrawingLayout(Gtk.Grid):
         list_box.add(draw_methods_row)
 
         # Add rgb setter
-        self.createRgbSpinButton(self.on_red_colour_change, list_box, "Set Red Color")
-        self.createRgbSpinButton(self.on_green_colour_change, list_box, "Set Green Color")
-        self.createRgbSpinButton(self.on_blue_colour_change, list_box, "Set Blue Color")
+        self.createSpinButton(self.on_red_colour_change, list_box, "Set Red Color")
+        self.createSpinButton(self.on_green_colour_change, list_box, "Set Green Color")
+        self.createSpinButton(self.on_blue_colour_change, list_box, "Set Blue Color")
+
+        # Line width setter
+        self.createSpinButton(self.set_line_width, list_box, "Set line width",
+                              Gtk.Adjustment(value=1, lower=1, upper=30, step_increment=1,
+                                             page_increment=10, page_size=0), 0)
 
         # Add a clear button to the header
         clear_button = Gtk.Button.new_with_label("Clear Canvas")
@@ -94,18 +133,19 @@ class DrawingLayout(Gtk.Grid):
 
         list_box.add(clear_row)
 
-        self.drawing_area = DrawingCanvasWidget()
         self.add(list_box)
         self.attach(self.drawing_area, 1, 0, 5, 1)
 
-    def createRgbSpinButton(self, value_changed_function, list_box, label):
+    def createSpinButton(self, value_changed_function, list_box, label, adjustment =
+                            Gtk.Adjustment(value=0, lower=0, upper=1, step_increment=0.01,
+                                           page_increment=0.1, page_size=0), decimal_points = 2):
 
         box = Gtk.Box(spacing=5)
 
-        adjustment = Gtk.Adjustment(value=0, lower=0, upper=255, step_increment=1, page_increment=10, page_size=0)
         spinbutton_color = Gtk.SpinButton()
         spinbutton_color.set_adjustment(adjustment)
         spinbutton_color.set_numeric(True)
+        spinbutton_color.set_digits(decimal_points)
         spinbutton_color.connect("value-changed", value_changed_function)
 
         box.add(spinbutton_color)
@@ -119,22 +159,20 @@ class DrawingLayout(Gtk.Grid):
         row.add(box)
         list_box.add(row)
 
-    # TODO
     def on_drawing_method_changed(self, combo):
-        return
+        self.drawing_area.setDrawingMethod(combo.get_active_text())
 
-    # TODO
     def on_red_colour_change(self, scroll):
-        print(scroll.get_value())
-        return
+        self.drawing_area.current_colour.red = scroll.get_value()
 
-    # TODO
     def on_green_colour_change(self, scroll):
-        return
+        self.drawing_area.current_colour.green = scroll.get_value()
 
-    # TODO
     def on_blue_colour_change(self, scroll):
-        return
+        self.drawing_area.current_colour.blue = scroll.get_value()
 
     def on_click_clear_draw(self, button):
         self.drawing_area.clear_canvas()
+
+    def set_line_width(self, scroll):
+        self.drawing_area.current_width = scroll.get_value()
