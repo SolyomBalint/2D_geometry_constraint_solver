@@ -7,16 +7,21 @@
  *    v has a back edge to one of the ancestors in DFS tree of u.
  */
 
-#include <cstdint>
-#include <iostream>
-#include <unordered_map>
 #include "graph.hpp"
-#include <spdlog/spdlog.h>
+#include <algorithm>
+#include <cstdint>
+#include <format>
+#include <iostream>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
+#include <unordered_map>
+#include <vector>
 
 using namespace MathUtils;
 
-const auto graphLogger = spdlog::stdout_color_mt("GRAPH");
+namespace {
+// NOLINTNEXTLINE (cert-err58-cpp)
+const auto GRAPH_LOGGER = spdlog::stdout_color_mt("GRAPH");
 
 struct FindArticulationNodeMetaInfo {
     uint16_t m_children = 0; ///< The number of children Nodes in the DFS tree of the current node
@@ -26,25 +31,25 @@ struct FindArticulationNodeMetaInfo {
     bool visited = false; ///< Whether the current node was visited in the current DFS search
 };
 
-// This should at least be a protected method of graph
+// NOLINTNEXTLINE(misc-no-recursion)
 void findCutVertices(std::unordered_map<Node, FindArticulationNodeMetaInfo, Node>& nodesMetaInfoMap,
     const Node& parentNode, std::vector<Node>& articulationNodes)
 {
-    static uint16_t time = 0;
+    static int16_t time = 0;
 
     auto& parentMetaInfo = nodesMetaInfoMap.at(parentNode);
 
     parentMetaInfo.visited = true;
     parentMetaInfo.m_discoveryTime = parentMetaInfo.low = time++;
 
-    for (auto& child : parentNode.m_edges) {
-        auto& currentChildNode = child.m_neighbour; // This may be shady since m_neighbour is a pointer!!!???
+    for (const auto& child : parentNode.m_edges) {
+        const auto& currentChildNode = child.m_neighbour; // This may be shady since m_neighbour is a pointer!!!???
         auto& currentChildMetaInfo = nodesMetaInfoMap.at(currentChildNode);
 
         if (!currentChildMetaInfo.visited) {
             parentMetaInfo.m_children++;
             currentChildMetaInfo.m_parent = &parentNode;
-            graphLogger->debug(
+            GRAPH_LOGGER->debug(
                 std::format("Found node in DFS tree: {}, parent: {}", currentChildNode.tempName, parentNode.tempName));
 
             // Stepping deeper in the DFS tree
@@ -55,7 +60,7 @@ void findCutVertices(std::unordered_map<Node, FindArticulationNodeMetaInfo, Node
             // Check if the current node is an articulation node, with checking if it's not root and if
             // it has a back edge above its parent
             if (parentMetaInfo.m_parent && currentChildMetaInfo.low >= parentMetaInfo.m_discoveryTime) {
-                graphLogger->debug("Found non-root articulation node");
+                GRAPH_LOGGER->debug("Found non-root articulation node");
                 articulationNodes.push_back(parentNode);
             }
         }
@@ -69,31 +74,33 @@ void findCutVertices(std::unordered_map<Node, FindArticulationNodeMetaInfo, Node
 
     // Check if the current node is an articulation node, with checking if it's  root and has two ore more children
     if (!parentMetaInfo.m_parent && parentMetaInfo.m_children > 1) {
-        graphLogger->debug("Found root articulation node");
+        GRAPH_LOGGER->debug("Found root articulation node");
         articulationNodes.push_back(parentNode);
     }
 };
+} // namespace
 
 std::vector<Node> UndirectedGraph::getCutVertices()
 {
     std::unordered_map<Node, FindArticulationNodeMetaInfo, Node> nodesMetaInfoMap;
     std::vector<Node> articulationNodes; // TODO this could be optimized with reference wrapper
 
-    for (auto& node : m_adjacencyList)
+    for (auto& node : m_adjacencyList_) {
         nodesMetaInfoMap.insert({ node, {} });
+    }
 
     // Makes sure the algorithm works for disconnected graphs as well
-    graphLogger->info("Articulation point search started based on Tarjan's recursive algorithm");
-    for (auto& node : m_adjacencyList) {
-        if (auto it = nodesMetaInfoMap.find(node); it != nodesMetaInfoMap.end()) {
-            if (!it->second.visited) {
-                findCutVertices(nodesMetaInfoMap, m_adjacencyList.front(), articulationNodes);
+    GRAPH_LOGGER->info("Articulation point search started based on Tarjan's recursive algorithm");
+    for (auto& node : m_adjacencyList_) {
+        if (auto iter = nodesMetaInfoMap.find(node); iter != nodesMetaInfoMap.end()) {
+            if (!iter->second.visited) {
+                findCutVertices(nodesMetaInfoMap, m_adjacencyList_.front(), articulationNodes);
             }
         } else {
-            std::cerr << node.tempName << " is not found in map while checking for disconnected graph" << std::endl;
+            std::cerr << node.tempName << " is not found in map while checking for disconnected graph" << '\n';
         }
     }
 
-    graphLogger->info("Articulation point search finished");
+    GRAPH_LOGGER->info("Articulation point search finished");
     return articulationNodes;
 }

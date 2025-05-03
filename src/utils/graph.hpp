@@ -1,13 +1,18 @@
 #ifndef GRAPH_HPP
 #define GRAPH_HPP
 
-#include <vector>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
+#include <cstddef>
+#include <format>
+#include <functional>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace MathUtils {
 
-class Node;
+struct Node;
 
 struct Edge {
     const Node& m_neighbour;
@@ -35,7 +40,7 @@ struct Node {
 
     explicit Node()
         : m_edges({})
-        , m_uuid(boost::uuids::random_generator()())
+        , m_uuid_(boost::uuids::random_generator()())
     {
     }
 
@@ -44,45 +49,47 @@ struct Node {
     Node& operator=(const Node&) = default;
     Node& operator=(Node&&) = default;
 
-    bool operator==(const Node& other) const
-    {
-        return m_uuid == other.m_uuid;
-    }
+    bool operator==(const Node& other) const { return m_uuid_ == other.m_uuid_; }
 
     /**
      * Returns hash value based on uuid
      */
     std::size_t operator()(MathUtils::Node const& node) const noexcept
     {
-        return std::hash<boost::uuids::uuid> {}(node.m_uuid);
+        return std::hash<boost::uuids::uuid> {}(node.m_uuid_);
     }
 
 private:
     inline static int tempCoutner = 1;
-    boost::uuids::uuid m_uuid;
+    boost::uuids::uuid m_uuid_;
 };
 
 class Graph {
 public:
+    Graph(Graph&) = default;
+    Graph(Graph&&) = default;
+    Graph& operator=(const Graph&) = default;
+    Graph& operator=(const Graph&&) = delete;
+    virtual ~Graph() = default;
     virtual std::vector<Node> getCutVertices() = 0;
 };
 
 class UndirectedGraph : public Graph {
 public:
-    std::vector<Node> getCutVertices();
+    std::vector<Node> getCutVertices() override;
 
     explicit UndirectedGraph(std::vector<Node> inList)
         : Graph()
-        , m_adjacencyList(inList)
+        , m_adjacencyList_(std::move(inList))
     {
     }
 
-    const std::vector<Node>& getAdjList() const { return m_adjacencyList; }
+    const std::vector<Node>& getAdjList() const { return m_adjacencyList_; }
 
 private:
-    std::vector<Node> m_adjacencyList;
+    std::vector<Node> m_adjacencyList_;
 };
 
-}
+} // namespace MathUtils
 
 #endif // GRAPH_HPP

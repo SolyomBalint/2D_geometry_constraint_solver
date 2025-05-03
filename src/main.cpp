@@ -1,4 +1,6 @@
 // General STD/STL headers
+#include <cstdlib>
+#include <exception>
 #include <format>
 
 // Custom headers
@@ -6,31 +8,45 @@
 
 // Thirdparty headers not needed for rendering
 #include <argparse/argparse.hpp>
-#include <spdlog/spdlog.h>
+#include <iostream>
+#include <memory>
+#include <ostream>
+#include <span>
+#include <spdlog/common.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
+#include <string>
+#include <vector>
 
-auto mainLogger = spdlog::stdout_color_mt("MAIN");
+namespace {
+// NOLINTNEXTLINE note this should be investigated
+const auto MAIN_LOGGER = spdlog::stdout_color_mt("MAIN");
 
-int ConvertLogLevel(const std::string& input)
+int convertLogLevel(const std::string& input)
 {
     if (input == "TRACE") {
         return spdlog::level::trace;
-    } else if (input == "DEBUG") {
-        return spdlog::level::debug;
-    } else if (input == "INFO") {
-        return spdlog::level::info;
-    } else if (input == "WARN") {
-        return spdlog::level::warn;
-    } else if (input == "ERROR") {
-        return spdlog::level::err;
-    } else if (input == "CRITICAL") {
-        return spdlog::level::critical;
-    } else {
-        return -1;
     }
+    if (input == "DEBUG") {
+        return spdlog::level::debug;
+    }
+    if (input == "INFO") {
+        return spdlog::level::info;
+    }
+    if (input == "WARN") {
+        return spdlog::level::warn;
+    }
+    if (input == "ERROR") {
+        return spdlog::level::err;
+    }
+    if (input == "CRITICAL") {
+        return spdlog::level::critical;
+    }
+
+    return -1;
 }
 
-void InitParserArgumnets(argparse::ArgumentParser& argparser)
+void initParserArgumnets(argparse::ArgumentParser& argparser)
 {
     argparser.add_argument("--log-level")
         .help("Define the log-level of the program. Defuaults to INFO."
@@ -41,24 +57,27 @@ void InitParserArgumnets(argparse::ArgumentParser& argparser)
         .default_value(false);
 }
 
-void ParseArguments(argparse::ArgumentParser& argparser, int argc, char* argv[])
+void parseArguments(argparse::ArgumentParser& argparser, std::span<char*> args)
 {
     try {
-        argparser.parse_args(argc, argv);
+        // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions, bugprone-narrowing-conversions)
+        argparser.parse_args(args.size(), args.data());
     } catch (const std::exception& err) {
-        std::cerr << err.what() << std::endl;
+        std::cerr << err.what() << '\n';
+        // NOLINTNEXTLINE(concurrency-mt-unsafe)
         std::exit(-1);
     }
 
     {
         auto inputLogLevel = argparser.get<std::string>("--log-level");
-        auto logLevel = ConvertLogLevel(inputLogLevel);
+        auto logLevel = convertLogLevel(inputLogLevel);
 
         if (logLevel == -1) {
             std::cerr << std::format("Invalid log level input: {}, "
                                      "Allowed values: [TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL]",
                 inputLogLevel)
-                      << std::endl;
+                      << '\n';
+            // NOLINTNEXTLINE(concurrency-mt-unsafe)
             std::exit(-1);
         }
 
@@ -66,12 +85,13 @@ void ParseArguments(argparse::ArgumentParser& argparser, int argc, char* argv[])
         spdlog::set_level(static_cast<spdlog::level::level_enum>(logLevel));
     }
 }
+} // namespace
 
 int main(int argc, char* argv[])
 {
     argparse::ArgumentParser argparser("2D Geometry Constraint Solver", "0.0.0");
-    InitParserArgumnets(argparser);
-    ParseArguments(argparser, argc, argv);
+    initParserArgumnets(argparser);
+    parseArguments(argparser, std::span<char*> { argv, static_cast<size_t>(argc) });
 
     MathUtils::Node node1;
     MathUtils::Node node2;
@@ -101,10 +121,11 @@ int main(int argc, char* argv[])
     auto testGraph = std::make_unique<MathUtils::UndirectedGraph>(temp);
 
     auto cutVertices = testGraph->getCutVertices();
-    std::cout << "Cut vertices:" << std::endl;
+    std::cout << "Cut vertices:" << '\n';
 
-    for (auto& cutVertice : cutVertices)
-        std::cout << cutVertice.tempName << std::endl;
+    for (auto& cutVertice : cutVertices) {
+        std::cout << cutVertice.tempName << '\n';
+    }
 
     auto gui = argparser.get<bool>("--gui");
     if (gui) { }
