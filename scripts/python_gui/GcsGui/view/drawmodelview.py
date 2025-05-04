@@ -30,7 +30,7 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
     def __init__(self):
         super(DrawingCanvasWidget, self).__init__()
 
-        self.shape_buffer = [] # This will contain drawmodel.Drawable instances
+        self.shape_buffer = []  # This will contain drawmodel.Drawable instances
         self.current_colour: common.RgbColour = common.RgbColour(0, 0, 0)
         self.current_width: float = 5
         self.drawing_method: DrawingMethod = DrawingMethod.POINT  # Based on DrawingLayout combobox initialization
@@ -39,22 +39,29 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
 
         self.set_hexpand(True)
         self.set_vexpand(True)
-        self.set_events(Gdk.EventMask.BUTTON_PRESS_MASK)  # Mouse events have to be enabled manually
+        self.set_events(
+            Gdk.EventMask.BUTTON_PRESS_MASK
+            | Gdk.EventMask.BUTTON_RELEASE_MASK
+            | Gdk.EventMask.BUTTON1_MOTION_MASK
+            # | Gdk.EventMask.POINTER_MOTION_MASK  # Receives all mouse motion regardless of event
+        )  # Mouse events have to be enabled manually
         self.connect("button-press-event", self.on_button_press)
+        self.connect("button-release-event", self.on_button_release)
+        self.connect("motion-notify-event", self.on_motion_notify)
 
     def on_draw(self, wid, cr: cairo.Context):
 
         for shape in self.shape_buffer:
             shape.on_draw(wid, cr)
 
-    def on_button_press(self, w, e):
+    def on_button_press(self, widget, event):
 
-        if e.type == Gdk.EventType.BUTTON_PRESS and e.button == common.MouseButtonGtkId.LEFT_MOUSE_BUTTON:
+        if event.type == Gdk.EventType.BUTTON_PRESS and event.button == common.MouseButtonGtkId.LEFT_MOUSE_BUTTON:
 
             match self.drawing_method:
                 case DrawingMethod.POINT:
                     self.shape_buffer.append(
-                        drawmodel.Point(e.x, e.y, copy.deepcopy(self.current_width), copy.deepcopy(self.current_colour))
+                        drawmodel.Point(event.x, event.y, self.current_width, copy.deepcopy(self.current_colour))
                     )
 
                     self.queue_draw()
@@ -62,20 +69,52 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
                 case DrawingMethod.LINE:
                     if not self.temp_start_point:
                         self.temp_start_point = True
-                        self.shape_buffer.append(drawmodel.Point(e.x, e.y, copy.deepcopy(self.current_width),
-                                                                 copy.deepcopy(self.current_colour)))
+                        self.shape_buffer.append(
+                            drawmodel.Point(event.x, event.y, self.current_width, copy.deepcopy(self.current_colour))
+                        )
                     else:
                         self.shape_buffer.append(
-                            drawmodel.Line(self.shape_buffer[-1],
-                                           drawmodel.Point(e.x, e.y, copy.deepcopy(self.current_width),
-                                                           copy.deepcopy(self.current_colour)),
-                                           copy.deepcopy(self.current_width), copy.deepcopy(self.current_colour))
+                            drawmodel.Line(
+                                self.shape_buffer[-1],
+                                drawmodel.Point(
+                                    event.x,
+                                    event.y,
+                                    copy.deepcopy(self.current_width),
+                                    copy.deepcopy(self.current_colour),
+                                ),
+                                copy.deepcopy(self.current_width),
+                                copy.deepcopy(self.current_colour),
+                            )
                         )
                         self.shape_buffer.append(self.shape_buffer[-1].defining_point_two)
 
                         self.temp_start_point = False
 
                     self.queue_draw()
+                case DrawingMethod.CIRCLE:
+                    self.shape_buffer.append(
+                        drawmodel.Circle(
+                            drawmodel.CanvasCoord(event.x, event.y),
+                            0.0,
+                            self.current_width,
+                            copy.deepcopy(self.current_colour),
+                        )
+                    )
+
+    def on_motion_notify(self, widget, event):
+        match self.drawing_method:
+            case DrawingMethod.CIRCLE:
+                self.set_circle_radius_and_draw(drawmodel.CanvasCoord(event.x, event.y))
+
+    def on_button_release(self, widget, event):
+        if event.type == Gdk.EventType.BUTTON_RELEASE and event.button == common.MouseButtonGtkId.LEFT_MOUSE_BUTTON:
+            match self.drawing_method:
+                case DrawingMethod.CIRCLE:
+                    self.set_circle_radius_and_draw(drawmodel.CanvasCoord(event.x, event.y))
+
+    def set_circle_radius_and_draw(self, p: drawmodel.CanvasCoord):
+        self.shape_buffer[-1].calculate_and_set_radius(drawmodel.CanvasCoord(p.x, p.y))
+        self.queue_draw()
 
     def clear_canvas(self):
         self.shape_buffer.clear()
@@ -116,14 +155,33 @@ class DrawingLayout(Gtk.Grid):
         list_box.add(draw_methods_row)
 
         # Add rgb setter
-        self.createSpinButton(self.on_red_colour_change, list_box, "Set Red Color")
-        self.createSpinButton(self.on_green_colour_change, list_box, "Set Green Color")
-        self.createSpinButton(self.on_blue_colour_change, list_box, "Set Blue Color")
+        self.createSpinButton(
+            self.on_red_colour_change,
+            list_box,
+            "Set Red Color",
+            Gtk.Adjustment(value=0, lower=0, upper=1, step_increment=0.01, page_increment=0.1, page_size=0),
+        )
+        self.createSpinButton(
+            self.on_green_colour_change,
+            list_box,
+            "Set Green Color",
+            Gtk.Adjustment(value=0, lower=0, upper=1, step_increment=0.01, page_increment=0.1, page_size=0),
+        )
+        self.createSpinButton(
+            self.on_blue_colour_change,
+            list_box,
+            "Set Blue Color",
+            Gtk.Adjustment(value=0, lower=0, upper=1, step_increment=0.01, page_increment=0.1, page_size=0),
+        )
 
         # Line width setter
-        self.createSpinButton(self.set_line_width, list_box, "Set line width",
-                              Gtk.Adjustment(value=1, lower=1, upper=30, step_increment=1,
-                                             page_increment=10, page_size=0), 0)
+        self.createSpinButton(
+            self.set_line_width,
+            list_box,
+            "Set line width",
+            Gtk.Adjustment(value=1, lower=1, upper=30, step_increment=1, page_increment=10, page_size=0),
+            0,
+        )
 
         # Add a clear button to the header
         clear_button = Gtk.Button.new_with_label("Clear Canvas")
@@ -136,9 +194,14 @@ class DrawingLayout(Gtk.Grid):
         self.add(list_box)
         self.attach(self.drawing_area, 1, 0, 5, 1)
 
-    def createSpinButton(self, value_changed_function, list_box, label, adjustment =
-                            Gtk.Adjustment(value=0, lower=0, upper=1, step_increment=0.01,
-                                           page_increment=0.1, page_size=0), decimal_points = 2):
+    def createSpinButton(
+        self,
+        value_changed_function,
+        list_box,
+        label,
+        adjustment,
+        decimal_points=2,
+    ):
 
         box = Gtk.Box(spacing=5)
 

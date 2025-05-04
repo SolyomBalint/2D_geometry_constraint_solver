@@ -6,8 +6,8 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gdk, Gio, Gtk
 from GcsGui import *
+from gi.repository import Gdk, Gio, Gtk
 
 
 class GeometricConstraintSolverApp(Gtk.Application):
