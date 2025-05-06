@@ -4,6 +4,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, Gtk
 
+from .model import drawmodel, gcs
 from .view import drawmodelview, gcsview
 
 
@@ -36,8 +37,15 @@ class MainWindow(Gtk.ApplicationWindow):
         stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
         stack.set_transition_duration(500)
 
+        # Initialize the data containers. They should now about each other for some usecases
+        # Note that it is not good practice to bind the lifetime of these objects to the lifetime of the MainWindow
+        # But it is sufficient for our demo goals.
+        self.shape_data = drawmodel.ShapeManager(None)
+        self.gcs_data = gcs.GeometricConstraintSystem(self.shape_data)
+        self.shape_data.gcs = self.gcs_data
+
         # Create drawing area
-        drawing_area = drawmodelview.DrawingLayout()
+        drawing_area = drawmodelview.DrawingLayout(self.shape_data)
 
         # Create graph rendering
         graph_render = gcsview.own_small_example()

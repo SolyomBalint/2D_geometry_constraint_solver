@@ -5,12 +5,19 @@ from dataclasses import dataclass
 import cairo
 
 from ..common import commondatastructs as common
+from . import gcs
 
 
 @dataclass
 class CanvasCoord:
     x: float
     y: float
+
+
+class ShapeManager:
+    def __init__(self, gcs):
+        self.shape_buffer: list = []
+        self.gcs: gcs.GeometricConstraintSystem = gcs
 
 
 class Drawable(ABC):
@@ -22,8 +29,9 @@ class Drawable(ABC):
     def on_draw(self, wid, cr: cairo.Context):
         pass
 
-    def is_hit_by_point(self, x: float, y: float):
-        raise NotImplementedError(f"The point collosion function is not implemented for class: {type(self)}")
+    @abstractmethod
+    def is_hit_by_point(self, point: CanvasCoord) -> bool:
+        pass
 
 
 class Point(Drawable):
@@ -47,6 +55,12 @@ class Point(Drawable):
         # Restore the context to its original state
         cr.restore()
 
+    def is_hit_by_point(self, point: CanvasCoord) -> bool:
+        # Checking if distance of point from center is smaller than radius
+        if math.sqrt(math.pow(self.coords.x - point.x, 2) + math.pow(self.coords.y - point.y, 2)) <= self.point_radius:
+            return True
+        return False
+
 
 class Line(Drawable):
     def __init__(self, x: Point, y: Point, line_width: float, colour: common.RgbColour):
@@ -66,6 +80,31 @@ class Line(Drawable):
 
         cr.restore()
 
+    def is_hit_by_point(self, point: CanvasCoord) -> bool:
+        # check if point is between line segment (the line is not infinite)
+        if (
+            min(self.defining_point_one.coords.x, self.defining_point_two.coords.x)
+            <= point.x
+            <= max(self.defining_point_one.coords.x, self.defining_point_two.coords.x)
+        ) and (
+            min(self.defining_point_one.coords.y, self.defining_point_two.coords.y)
+            <= point.y
+            <= max(self.defining_point_one.coords.y, self.defining_point_two.coords.y)
+        ):
+
+            # Calculate the cross product: (px - x₁)(y₂ - y₁) - (py - y₁)(x₂ - x₁)
+            cross_product: float = (point.x - self.defining_point_one.coords.x) * (
+                self.defining_point_two.coords.y - self.defining_point_one.coords.y
+            ) - (point.y - self.defining_point_one.coords.y) * (
+                self.defining_point_two.coords.x - self.defining_point_one.coords.x
+            )
+
+            # We use the line width as the possible epsilon error
+            if cross_product < self.line_width:
+                return True
+
+        return False
+
 
 class Circle(Drawable):
     def __init__(self, center: CanvasCoord, radius: float, line_width: float, colour: common.RgbColour):
@@ -83,10 +122,15 @@ class Circle(Drawable):
         # Draw circle(point) at the correct position without translation
         cr.arc(self.center.x, self.center.y, self.radius, 0, 2 * math.pi)
         cr.stroke()
-        # cr.fill()
 
         # Restore the context to its original state
         cr.restore()
 
-    def calculate_and_set_radius(self, p: CanvasCoord):
-        self.radius = math.sqrt(math.pow(self.center.x - p.x, 2) + math.pow(self.center.y - p.y, 2))
+    def calculate_and_set_radius(self, point: CanvasCoord):
+        self.radius = math.sqrt(math.pow(self.center.x - point.x, 2) + math.pow(self.center.y - point.y, 2))
+
+    def is_hit_by_point(self, point: CanvasCoord) -> bool:
+        # Checking if distance of point from center is smaller than radius
+        if math.sqrt(math.pow(self.center.x - point.x, 2) + math.pow(self.center.y - point.y, 2)) <= self.radius:
+            return True
+        return False
