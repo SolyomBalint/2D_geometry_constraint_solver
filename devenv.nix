@@ -20,9 +20,12 @@ in
   packages = with pkgs_unstable; [
     ## Build tools
     libgcc
-    gcc14
+    gcc15
     gnumake
     cmake
+    llvmPackages_20.clang-tools
+    llvmPackages_20.clangNoCompilerRtWithLibc # in the local environemnt the goal is to be able to use both compilers
+    # for checking for mistakes, so we leave out the LLVM cpp libs to avoid linking issues
     ninja
     pkg-config
 
@@ -69,6 +72,12 @@ in
     };
   };
   enterShell = ''
-    echo $GREET
+    echo "██████╗ ███╗   ███╗███████╗    ██╗██╗████████╗"
+    echo "██╔══██╗████╗ ████║██╔════╝    ██║██║╚══██╔══╝"
+    echo "██████╔╝██╔████╔██║█████╗      ██║██║   ██║   "
+    echo "██╔══██╗██║╚██╔╝██║██╔══╝      ██║██║   ██║   "
+    echo "██████╔╝██║ ╚═╝ ██║███████╗    ██║██║   ██║   "
+    echo "╚═════╝ ╚═╝     ╚═╝╚══════╝    ╚═╝╚═╝   ╚═╝   "
+    echo ""
   '';
 }

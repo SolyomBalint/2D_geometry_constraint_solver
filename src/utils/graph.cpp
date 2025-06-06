@@ -1,5 +1,6 @@
 /**
- *  ALGORITHM SHORT DESCRIPTION
+ *  ALGORITHM SHORT DESCRIPTION TODO: move this part to actually the algorithm, this file will contain several other
+ *  solutions
  *  In DFS tree, a vertex u is an articulation point if one of the following two conditions is true.
  *
  *  - u is the root of the DFS tree and it has at least two children.
@@ -9,13 +10,24 @@
 
 #include "graph.hpp"
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <iostream>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 #include <unordered_map>
 #include <vector>
+
+namespace std {
+template <> struct hash<MathUtils::Node> {
+    std::size_t operator()(const MathUtils::Node& node) const noexcept
+    {
+        return std::hash<boost::uuids::uuid> {}(node.getUuId());
+    }
+};
+} // namespace std
 
 using namespace MathUtils;
 
@@ -32,8 +44,8 @@ struct FindArticulationNodeMetaInfo {
 };
 
 // NOLINTNEXTLINE(misc-no-recursion)
-void findCutVertices(std::unordered_map<Node, FindArticulationNodeMetaInfo, Node>& nodesMetaInfoMap,
-    const Node& parentNode, std::vector<Node>& articulationNodes)
+void findCutVertices(std::unordered_map<Node, FindArticulationNodeMetaInfo>& nodesMetaInfoMap, const Node& parentNode,
+    std::vector<Node>& articulationNodes)
 {
     static int16_t time = 0;
 
@@ -82,7 +94,7 @@ void findCutVertices(std::unordered_map<Node, FindArticulationNodeMetaInfo, Node
 
 std::vector<Node> UndirectedGraph::getCutVertices()
 {
-    std::unordered_map<Node, FindArticulationNodeMetaInfo, Node> nodesMetaInfoMap;
+    std::unordered_map<Node, FindArticulationNodeMetaInfo> nodesMetaInfoMap;
     std::vector<Node> articulationNodes; // TODO this could be optimized with reference wrapper
 
     for (auto& node : m_adjacencyList_) {

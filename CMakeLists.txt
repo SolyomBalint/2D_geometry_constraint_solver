@@ -33,4 +33,12 @@ target_include_directories(${PROJECT_NAME} PRIVATE ./include
             ${Boost_INCLUDE_DIRS})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog  argparse::argparse ${Boost_LIBRARIES} Python3::Python)
-target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:-ggdb>)
+
+# Explanation why these flags are used:
+# -ggdb: if debugging use it for full support of gdb
+# -pedantic-errors: only support standard c++ features
+# The rest turns on several useful warnings, the `Weffc++` flag turns on checks
+# coming from Scott Meyers series
+# TODO: make sure that the flags are correct for different compilers such as gcc and clang
+target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:-ggdb>
+-pedantic-errors -Wall -Weffc++ -Wextra -Wconversion -Wsign-conversion)

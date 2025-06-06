@@ -12,9 +12,10 @@
 
 namespace MathUtils {
 
-struct Node;
+class Node;
 
-struct Edge {
+class Edge {
+public:
     const Node& m_neighbour;
 
     explicit Edge(const Node& neighbour)
@@ -24,6 +25,9 @@ struct Edge {
 
     Edge(const Edge&) = default;
     Edge(Edge&&) = default;
+    Edge& operator=(const Edge&) = delete;
+    Edge& operator=(Edge&&) = delete;
+    ~Edge() = default;
 
     bool operator==(const Edge& other) const
     {
@@ -33,9 +37,11 @@ struct Edge {
 };
 
 // TODO think this trough because of directed graphs
-struct Node {
+class Node {
+public:
     std::string tempName = std::format("node{}", tempCoutner++); ///< Temporary naming logic, helps in printf debugging
 
+    // TODO: fix this
     std::vector<Edge> m_edges;
 
     explicit Node()
@@ -48,16 +54,11 @@ struct Node {
     Node(Node&&) = default;
     Node& operator=(const Node&) = default;
     Node& operator=(Node&&) = default;
+    ~Node() = default;
 
     bool operator==(const Node& other) const { return m_uuid_ == other.m_uuid_; }
 
-    /**
-     * Returns hash value based on uuid
-     */
-    std::size_t operator()(MathUtils::Node const& node) const noexcept
-    {
-        return std::hash<boost::uuids::uuid> {}(node.m_uuid_);
-    }
+    const boost::uuids::uuid& getUuId() const { return m_uuid_; }
 
 private:
     inline static int tempCoutner = 1;
@@ -66,6 +67,7 @@ private:
 
 class Graph {
 public:
+    Graph() = default;
     Graph(Graph&) = default;
     Graph(Graph&&) = default;
     Graph& operator=(const Graph&) = default;
@@ -79,8 +81,7 @@ public:
     std::vector<Node> getCutVertices() override;
 
     explicit UndirectedGraph(std::vector<Node> inList)
-        : Graph()
-        , m_adjacencyList_(std::move(inList))
+        : m_adjacencyList_(std::move(inList))
     {
     }
 
