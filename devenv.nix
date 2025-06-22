@@ -1,18 +1,13 @@
-{
-  pkgs,
-  lib,
-  config,
-  inputs,
-  ...
-}:
+{ pkgs, lib, config, inputs, ... }:
 let
-  pkgs_unstable = import inputs.unstable_nixkpgs { system = pkgs.stdenv.system; };
-in
-{
+  pkgs_unstable =
+    import inputs.unstable_nixkpgs { system = pkgs.stdenv.system; };
+in {
   cachix.enable = true;
   cachix.pull = [ "pre-commit-hooks" ];
   # Environmental variables
-  env.GREET = "Welcome to 2D geometry constraint solver development environment!";
+  env.GREET =
+    "Welcome to 2D geometry constraint solver development environment!";
   # env.DEVENV_GCC = "${pkgs_unstable.libgcc.out}/bin/gcc";
   # env.DEVENV_GPP = "${pkgs_unstable.libgcc.out}/bin/g++";
 
@@ -38,15 +33,10 @@ in
     ## Build deps
     spdlog # MIT licence
     argparse # MIT licence
-    boost.dev # Boost software licence
-    boost.out
+    stduuid
 
     ## Example gui dependencies
-    (python313.withPackages (
-      ps: with ps; [
-        graph-tool
-      ]
-    ))
+    (python313.withPackages (ps: with ps; [ graph-tool ]))
     ### For graph_tool
     gtk3
     librsvg
@@ -72,6 +62,7 @@ in
     };
   };
   enterShell = ''
+    echo ""
     echo "██████╗ ███╗   ███╗███████╗    ██╗██╗████████╗"
     echo "██╔══██╗████╗ ████║██╔════╝    ██║██║╚══██╔══╝"
     echo "██████╔╝██╔████╔██║█████╗      ██║██║   ██║   "

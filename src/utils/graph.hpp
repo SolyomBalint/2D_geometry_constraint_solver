@@ -1,13 +1,11 @@
 #ifndef GRAPH_HPP
 #define GRAPH_HPP
 
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <cstddef>
+#include <common/common_uuid.hpp>
 #include <format>
-#include <functional>
 #include <string>
 #include <utility>
+#include <uuid.h>
 #include <vector>
 
 namespace MathUtils {
@@ -46,7 +44,7 @@ public:
 
     explicit Node()
         : m_edges({})
-        , m_uuid_(boost::uuids::random_generator()())
+        , m_uuid_(common::uuid::generateUuidMt19937())
     {
     }
 
@@ -58,11 +56,11 @@ public:
 
     bool operator==(const Node& other) const { return m_uuid_ == other.m_uuid_; }
 
-    const boost::uuids::uuid& getUuId() const { return m_uuid_; }
+    const uuids::uuid& getUuId() const { return m_uuid_; }
 
 private:
     inline static int tempCoutner = 1;
-    boost::uuids::uuid m_uuid_;
+    uuids::uuid m_uuid_;
 };
 
 class Graph {

@@ -15,8 +15,8 @@ set(CMAKE_DEVENV_PROFILE $ENV{DEVENV_PROFILE})
 configure_file(${CMAKE_CURRENT_LIST_DIR}/pyproject.toml.template ${CMAKE_CURRENT_LIST_DIR}/pyproject.toml)
 
 find_package(spdlog REQUIRED)
+find_package(stduuid REQUIRED)
 find_package(argparse REQUIRED)
-find_package(Boost REQUIRED)
 find_package(Python3 COMPONENTS Development Interpreter REQUIRED)
 
 # IMPORTANT NOTE: Currently this project outputs only one binary. There is no
@@ -28,11 +28,11 @@ add_executable(${PROJECT_NAME}  src/main.cpp
                                 src/utils/graph.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ./include
+            src/common
             ${spdlog_INCLUDE_DIRS}
-            ${argparse_INCLUDE_DIRS}
-            ${Boost_INCLUDE_DIRS})
+            ${argparse_INCLUDE_DIRS})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog  argparse::argparse ${Boost_LIBRARIES} Python3::Python)
+target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog  argparse::argparse Python3::Python stduuid)
 
 # Explanation why these flags are used:
 # -ggdb: if debugging use it for full support of gdb

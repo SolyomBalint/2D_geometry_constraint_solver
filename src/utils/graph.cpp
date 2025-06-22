@@ -18,13 +18,14 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 #include <unordered_map>
+#include <uuid.h>
 #include <vector>
 
 namespace std {
 template <> struct hash<MathUtils::Node> {
     std::size_t operator()(const MathUtils::Node& node) const noexcept
     {
-        return std::hash<boost::uuids::uuid> {}(node.getUuId());
+        return std::hash<uuids::uuid> {}(node.getUuId());
     }
 };
 } // namespace std
