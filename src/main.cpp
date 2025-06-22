@@ -149,7 +149,8 @@ int main(int argc, char* argv[])
 
     std::unique_ptr<mathutils::Expression> expr5 = std::make_unique<mathutils::Division>(
         std::make_unique<mathutils::Constant>(16.0, std::make_unique<mathutils::Constant>(0.5)),
-        std::make_unique<mathutils::Constant>(2.0));
+        std::make_unique<mathutils::Constant>(2.0),
+        std::make_unique<mathutils::Constant>(2.0, std::make_unique<mathutils::Constant>(0.5)));
     std::cout << *expr5.get() << '=' << expr5.get()->evaluate(map) << '\n';
 
     auto testVar = std::make_unique<mathutils::Variable>("x");

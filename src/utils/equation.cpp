@@ -1,14 +1,15 @@
 #include "equation.hpp"
 
 namespace mathutils {
-void Constant::print(std::ostream& os) const
+std::ostream& operator<<(std::ostream& os, mathutils::Expression const& e)
 {
-    if (!exponent) {
-        os << constValue;
-        return;
+    e.print(os);
+
+    if (e.exponent) {
+        os << '^' << *(e.exponent);
     }
 
-    os << constValue << '^' << *exponent;
+    return os;
 }
 
 double Constant::evaluate(const std::unordered_map<common::Uuid, double>& variableValueMapping) const
@@ -18,17 +19,6 @@ double Constant::evaluate(const std::unordered_map<common::Uuid, double>& variab
     }
 
     return std::pow(constValue, exponent->evaluate(variableValueMapping));
-}
-
-// This is code duplication, if it gets bigger then minimal functions create parent class for Constant and Variable
-void Variable::print(std::ostream& os) const
-{
-    if (!exponent) {
-        os << variableName;
-        return;
-    }
-
-    os << variableName << '^' << *exponent;
 }
 
 double Variable::evaluate(const std::unordered_map<common::Uuid, double>& variableValueMapping) const
@@ -45,4 +35,16 @@ double Variable::evaluate(const std::unordered_map<common::Uuid, double>& variab
 
     return std::pow(iter->second, exponent->evaluate(variableValueMapping));
 }
+
+double TwoOperandOperation::evaluate(const std::unordered_map<common::Uuid, double>& variableValueMapping) const
+{
+    auto result = do_operator(lhs->evaluate(variableValueMapping), rhs->evaluate(variableValueMapping));
+
+    if (exponent) {
+        return std::pow(result, exponent->evaluate(variableValueMapping));
+    }
+
+    return result;
+}
+
 } // namespace mathutils

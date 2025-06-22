@@ -13,8 +13,9 @@ public:
 
     virtual ~Expression() = default;
 
-    explicit Expression()
-        : UUID(common::generateUuidMt19937())
+    explicit Expression(const std::shared_ptr<const Expression> exponent = nullptr)
+        : exponent(exponent)
+        , UUID(common::generateUuidMt19937())
     {
     }
 
@@ -25,6 +26,9 @@ public:
 
     const common::Uuid& getUuid() const { return UUID; }
 
+protected:
+    const std::shared_ptr<const Expression> exponent;
+
 private:
     const common::Uuid UUID;
 
@@ -33,18 +37,13 @@ private:
     friend std::ostream& operator<<(std::ostream& os, mathutils::Expression const& e);
 };
 
-inline std::ostream& operator<<(std::ostream& os, mathutils::Expression const& e)
-{
-    e.print(os);
-    return os;
-}
+std::ostream& operator<<(std::ostream& os, mathutils::Expression const& e);
 
 class Constant final : public Expression {
 public:
     explicit Constant(double constValue, const std::shared_ptr<const Expression> exponent = nullptr)
-        : Expression()
+        : Expression(exponent)
         , constValue(constValue)
-        , exponent(exponent)
     {
     }
 
@@ -52,17 +51,15 @@ public:
 
 private:
     const double constValue;
-    const std::shared_ptr<const Expression> exponent;
 
-    virtual void print(std::ostream& os) const override;
+    virtual void print(std::ostream& os) const override { os << constValue; }
 };
 
 class Variable final : public Expression {
 public:
     explicit Variable(std::string variableName = "", const std::shared_ptr<const Expression> exponent = nullptr)
-        : Expression()
+        : Expression(exponent)
         , variableName(variableName)
-        , exponent(exponent)
     {
     }
 
@@ -71,25 +68,20 @@ public:
 private:
     const std::string variableName;
 
-    // Expressions are designed to be immutable, so using this approach should be safe, and save a little bit of memory
-    const std::shared_ptr<const Expression> exponent;
-
-    virtual void print(std::ostream& os) const override;
+    virtual void print(std::ostream& os) const override { os << variableName; }
 };
 
 class TwoOperandOperation : public Expression {
 public:
-    explicit TwoOperandOperation(std::unique_ptr<const Expression> lhs, std::unique_ptr<const Expression> rhs)
-        : Expression()
+    explicit TwoOperandOperation(std::unique_ptr<const Expression> lhs, std::unique_ptr<const Expression> rhs,
+        const std::shared_ptr<const Expression> exponent = nullptr)
+        : Expression(exponent)
         , lhs(std::move(lhs))
         , rhs(std::move(rhs))
     {
     }
 
-    virtual double evaluate(const std::unordered_map<common::Uuid, double>& variableValueMapping) const override
-    {
-        return do_operator(lhs->evaluate(variableValueMapping), rhs->evaluate(variableValueMapping));
-    }
+    virtual double evaluate(const std::unordered_map<common::Uuid, double>& variableValueMapping) const override;
 
 private:
     const std::unique_ptr<const Expression> lhs;
