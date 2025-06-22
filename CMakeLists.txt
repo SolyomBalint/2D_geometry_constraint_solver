@@ -25,7 +25,8 @@ find_package(Python3 COMPONENTS Development Interpreter REQUIRED)
 # correct linking
 
 add_executable(${PROJECT_NAME}  src/main.cpp
-                                src/utils/graph.cpp)
+                                src/utils/graph.cpp
+                                src/utils/equation.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ./include
             src/common

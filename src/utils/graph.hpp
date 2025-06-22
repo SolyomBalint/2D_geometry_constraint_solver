@@ -8,7 +8,7 @@
 #include <uuid.h>
 #include <vector>
 
-namespace MathUtils {
+namespace mathutils {
 
 class Node;
 
@@ -44,7 +44,7 @@ public:
 
     explicit Node()
         : m_edges({})
-        , m_uuid_(common::uuid::generateUuidMt19937())
+        , m_uuid_(common::generateUuidMt19937())
     {
     }
 
@@ -56,11 +56,11 @@ public:
 
     bool operator==(const Node& other) const { return m_uuid_ == other.m_uuid_; }
 
-    const uuids::uuid& getUuId() const { return m_uuid_; }
+    const common::Uuid& getUuId() const { return m_uuid_; }
 
 private:
     inline static int tempCoutner = 1;
-    uuids::uuid m_uuid_;
+    common::Uuid m_uuid_;
 };
 
 class Graph {
@@ -89,6 +89,6 @@ private:
     std::vector<Node> m_adjacencyList_;
 };
 
-} // namespace MathUtils
+} // namespace mathutils
 
 #endif // GRAPH_HPP

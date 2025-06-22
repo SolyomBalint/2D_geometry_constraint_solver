@@ -1,7 +1,7 @@
 #ifndef PIPELINE_HPP
 #define PIPELINE_HPP
 
-namespace ConstraintSolving {
+namespace constraintsolver {
 
 class Detector {
 public:
@@ -20,8 +20,7 @@ class Solver {
     virtual void solveGcs() = 0;
 };
 
-class PipeLine {
-};
+class PipeLine { };
 
 };
 

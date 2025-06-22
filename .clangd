@@ -44,6 +44,7 @@ Diagnostics:
       'llvm-header-guard',
       'google-build-using-namespace',
       'misc-non-private-member-variables-in-classes',
+      'readability-identifier-length'
       
       # Disable checks that might conflict with C++20 features
       'modernize-use-nodiscard',  # Let C++20 attributes handle this
@@ -74,7 +75,7 @@ Diagnostics:
       modernize-pass-by-value.IncludeStyle: google
       modernize-use-override.IgnoreDestructors: true
       modernize-loop-convert.MinConfidence: reasonable
-      modernize-use-auto.MinTypeNameLength: 5
+      modernize-use-auto.MinTypeNameLength: 2
       
       # Performance tuning
       performance-unnecessary-value-param.IncludeStyle: google

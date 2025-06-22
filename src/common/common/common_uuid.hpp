@@ -8,8 +8,11 @@
 #include <random>
 #include <uuid.h>
 
-namespace common::uuid {
-inline uuids::uuid generateUuidMt19937()
+namespace common {
+
+using Uuid = uuids::uuid;
+
+inline Uuid generateUuidMt19937()
 {
     std::random_device randomDevice;
     auto seedData = std::array<int, std::mt19937::state_size> {};
