@@ -73,19 +73,19 @@ private:
 
 class TwoOperandOperation : public Expression {
 public:
-    explicit TwoOperandOperation(std::unique_ptr<const Expression> lhs, std::unique_ptr<const Expression> rhs,
+    explicit TwoOperandOperation(std::shared_ptr<const Expression> lhs, std::shared_ptr<const Expression> rhs,
         const std::shared_ptr<const Expression> exponent = nullptr)
         : Expression(exponent)
-        , lhs(std::move(lhs))
-        , rhs(std::move(rhs))
+        , lhs(lhs)
+        , rhs(rhs)
     {
     }
 
     virtual double evaluate(const std::unordered_map<common::Uuid, double>& variableValueMapping) const override;
 
 private:
-    const std::unique_ptr<const Expression> lhs;
-    const std::unique_ptr<const Expression> rhs;
+    const std::shared_ptr<const Expression> lhs;
+    const std::shared_ptr<const Expression> rhs;
 
     virtual char get_operator() const = 0;
 
