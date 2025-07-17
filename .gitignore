@@ -45,6 +45,9 @@ devenv.local.nix
 ## Custom ignores
 **/build/*
 
+.conan2/*
+CMakeUserPresets.json
+
 .cache
 examples/*
 
