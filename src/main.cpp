@@ -131,36 +131,36 @@ int main(int argc, char* argv[])
 
     MAIN_LOGGER->info("Equation tests beginning");
 
-    std::unique_ptr<mathutils::Expression> expr1 = std::make_unique<mathutils::Constant>(10.0);
+    std::shared_ptr<mathutils::Expression> expr1 = std::make_shared<mathutils::Constant>(10.0);
     std::unordered_map<common::Uuid, double> map;
-    std::cout << *expr1.get() << '=' << expr1.get()->evaluate(map) << '\n';
+    std::cout << *expr1.get() << '=' << expr1->evaluate(map) << '\n';
 
-    std::unique_ptr<mathutils::Expression> expr2 = std::make_unique<mathutils::Addition>(
-        std::make_unique<mathutils::Constant>(10.0), std::make_unique<mathutils::Constant>(10.0));
-    std::cout << *expr2.get() << '=' << expr2.get()->evaluate(map) << '\n';
+    std::shared_ptr<mathutils::Expression> expr2 = std::make_shared<mathutils::Addition>(
+        std::make_shared<mathutils::Constant>(10.0), std::make_shared<mathutils::Constant>(10.0));
+    std::cout << *expr2.get() << '=' << expr2->evaluate(map) << '\n';
 
-    std::unique_ptr<mathutils::Expression> expr3 = std::make_unique<mathutils::Multiplication>(
-        std::make_unique<mathutils::Constant>(10.0), std::make_unique<mathutils::Constant>(10.0));
-    std::cout << *expr3.get() << '=' << expr3.get()->evaluate(map) << '\n';
+    std::shared_ptr<mathutils::Expression> expr3 = std::make_shared<mathutils::Multiplication>(
+        std::make_shared<mathutils::Constant>(10.0), std::make_shared<mathutils::Constant>(10.0));
+    std::cout << *expr3.get() << '=' << expr3->evaluate(map) << '\n';
 
-    std::unique_ptr<mathutils::Expression> expr4 = std::make_unique<mathutils::Subtraction>(
-        std::make_unique<mathutils::Constant>(10.0), std::make_unique<mathutils::Constant>(10.0));
-    std::cout << *expr4.get() << '=' << expr4.get()->evaluate(map) << '\n';
+    std::shared_ptr<mathutils::Expression> expr4 = std::make_shared<mathutils::Subtraction>(
+        std::make_shared<mathutils::Constant>(10.0), std::make_shared<mathutils::Constant>(10.0));
+    std::cout << *expr4.get() << '=' << expr4->evaluate(map) << '\n';
 
-    std::unique_ptr<mathutils::Expression> expr5 = std::make_unique<mathutils::Division>(
-        std::make_unique<mathutils::Constant>(16.0, std::make_unique<mathutils::Constant>(0.5)),
-        std::make_unique<mathutils::Constant>(2.0),
-        std::make_unique<mathutils::Constant>(2.0, std::make_unique<mathutils::Constant>(0.5)));
-    std::cout << *expr5.get() << '=' << expr5.get()->evaluate(map) << '\n';
+    std::shared_ptr<mathutils::Expression> expr5 = std::make_shared<mathutils::Division>(
+        std::make_shared<mathutils::Constant>(16.0, std::make_shared<mathutils::Constant>(0.5)),
+        std::make_shared<mathutils::Constant>(2.0),
+        std::make_shared<mathutils::Constant>(2.0, std::make_shared<mathutils::Constant>(0.5)));
+    std::cout << *expr5.get() << '=' << expr5->evaluate(map) << '\n';
 
-    auto testVar = std::make_unique<mathutils::Variable>("x");
+    auto testVar = std::make_shared<mathutils::Variable>("x");
     auto uuid = testVar->getUuid();
 
-    auto testVar2 = std::make_unique<mathutils::Variable>("y");
+    auto testVar2 = std::make_shared<mathutils::Variable>("y");
     auto uuid2 = testVar2->getUuid();
 
-    std::unique_ptr<mathutils::Expression> expr6
-        = std::make_unique<mathutils::Division>(std::move(testVar), std::move(testVar2));
+    std::shared_ptr<mathutils::Expression> expr6
+        = std::make_shared<mathutils::Division>(std::move(testVar), std::move(testVar2));
 
     map[uuid] = 20;
 

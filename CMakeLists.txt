@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
+
 # Needed by spdlog to compile
 set(CMAKE_POSITION_INDEPENDENT_CODE true)
 
@@ -31,9 +32,11 @@ add_executable(${PROJECT_NAME}  src/main.cpp
 target_include_directories(${PROJECT_NAME} PRIVATE ./include
             src/common
             ${spdlog_INCLUDE_DIRS}
-            ${argparse_INCLUDE_DIRS})
+            ${argparse_INCLUDE_DIRS}
+            ${stduuid_INCLUDE_DIRS})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog  argparse::argparse Python3::Python stduuid)
+target_compile_definitions(${PROJECT_NAME} PRIVATE SPDLOG_USE_STD_FORMAT LIBUUID_CPP20_OR_GREATER)
+target_link_libraries(${PROJECT_NAME} PRIVATE stduuid::stduuid argparse::argparse spdlog::spdlog)
 
 # Explanation why these flags are used:
 # -ggdb: if debugging use it for full support of gdb
