@@ -6,6 +6,7 @@
 // Custom headers
 #include "./utils/graph.hpp"
 #include "./utils/equation.hpp"
+#include "./constraint_solver/constraint_equation_solver.hpp"
 
 // Thirdparty headers not needed for rendering
 #include <argparse/argparse.hpp>
@@ -169,6 +170,9 @@ int main(int argc, char* argv[])
     std::cout << *expr6.get() << '=' << expr6.get()->evaluate(map) << '\n';
 
     auto gui = argparser.get<bool>("--gui");
+
+    testJacobian();
+
     if (gui) { }
 
     return 0;

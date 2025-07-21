@@ -49,17 +49,20 @@ FetchContent_MakeAvailable(autodiff)
 
 add_executable(${PROJECT_NAME}  src/main.cpp
                                 src/utils/graph.cpp
-                                src/utils/equation.cpp)
+                                src/utils/equation.cpp
+                                src/constraint_solver/constraint_equation_solver.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ./include
             src/common
             ${spdlog_INCLUDE_DIRS}
             ${argparse_INCLUDE_DIRS}
             ${stduuid_INCLUDE_DIRS}
-            ${autodiff_INCLUDE_DIRS})
+            ${autodiff_INCLUDE_DIRS}
+            ${Eigen3_INCLUDE_DIRS})
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE SPDLOG_USE_STD_FORMAT LIBUUID_CPP20_OR_GREATER)
-target_link_libraries(${PROJECT_NAME} PRIVATE stduuid::stduuid argparse::argparse spdlog::spdlog autodiff::autodiff)
+target_link_libraries(${PROJECT_NAME} PRIVATE   stduuid::stduuid argparse::argparse
+                                                spdlog::spdlog autodiff::autodiff Eigen3::Eigen)
 
 # Explanation why these flags are used:
 # -ggdb: if debugging use it for full support of gdb
