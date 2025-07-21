@@ -10,12 +10,15 @@ class ProjectRecipe(ConanFile):
         self.requires("spdlog/[~1.15]")
         self.requires("stduuid/[~1.2]")
         self.requires("argparse/3.2")
+        self.requires("eigen/[~3.4]")
 
     def configure(self):
         self.options["stduuid"].with_cxx20_span = True
 
         self.options["spdlog"].use_std_fmt = True
         self.options["spdlog"].shared = True  # Add this
+
+        self.options["eigen"].MPL2_only = True  # Add this
 
     def layout(self):
         cmake_layout(self)
