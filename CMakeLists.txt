@@ -49,7 +49,6 @@ FetchContent_MakeAvailable(autodiff)
 
 add_executable(${PROJECT_NAME}  src/main.cpp
                                 src/utils/graph.cpp
-                                src/utils/equation.cpp
                                 src/constraint_solver/constraint_equation_solver.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ./include

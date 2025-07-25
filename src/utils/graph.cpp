@@ -22,15 +22,15 @@
 #include <vector>
 
 namespace std {
-template <> struct hash<mathutils::Node> {
-    std::size_t operator()(const mathutils::Node& node) const noexcept
+template <> struct hash<MathUtils::Node> {
+    std::size_t operator()(const MathUtils::Node& node) const noexcept
     {
-        return std::hash<common::Uuid> {}(node.getUuId());
+        return std::hash<Common::Uuid> {}(node.getUuId());
     }
 };
 } // namespace std
 
-using namespace mathutils;
+using namespace MathUtils;
 
 namespace {
 // NOLINTNEXTLINE (cert-err58-cpp)

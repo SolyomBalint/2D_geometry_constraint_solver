@@ -3,101 +3,72 @@
 #include <autodiff/forward/real.hpp>
 #include <autodiff/forward/dual.hpp>
 #include <autodiff/forward/real/eigen.hpp>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 #include <format>
 #include <Eigen/Dense>
-using namespace autodiff;
-using namespace Eigen;
 
-VectorX<dual> f(const VectorX<dual>& x)
+namespace Solver {
+// Keep internal linkage for now
+static const auto SOLVER_LOGGER = spdlog::stdout_color_mt("SOLVER");
+static constexpr double ERROR = 0.00001;
+static constexpr int32_t MAXIMUM_ITERATIONS = 1000;
+
+autodiff::dual f(autodiff::dual xCoord, autodiff::dual yCoord, const autodiff::dual& d3)
 {
-    dual t1 = x(0);
-    dual t2 = x(1);
-    dual r = sqrt(13.0);
-
-    VectorX<dual> res(2);
-    res(0) = r * cos(t1) - t2;
-    res(1) = r * sin(t1) - (t2 * t2 - 1.0);
-    return res;
+    return pow(xCoord, 2) + pow(yCoord, 2) - pow(d3, 2);
+}
+autodiff::dual g(autodiff::dual xCoord, autodiff::dual yCoord, const autodiff::dual& d1, const autodiff::dual& d2)
+{
+    return pow(d1 - xCoord, 2) + pow(-yCoord, 2) - pow(d2, 2);
 }
 
-dual g(dual x, dual y) { return pow(x, 2) + pow(y, 2) - 13; }
-dual h(dual x, dual y) { return pow(x, 2) - y - 1; }
-
-void testJacobian()
+std::vector<Coordinates2D> calculatePointToPointDistanceTriangle(
+    const double xToYDistance, const double xToZDistance, const double yToZDistance)
 {
-    double error = 0.1;
-    // TODO: Create dynamic vectors from these so that this code is actually reusable not just a POC
-    double previousX { 0.0 };
-    double previousY { 0.0 };
+    using autodiff::at;
+    using autodiff::derivative;
+    using autodiff::dual;
+    using autodiff::wrt;
+    using Dual2DColVector = Eigen::Matrix<dual, 2, 1>;
 
-    dual x = 1;
-    dual y = 1;
+    // Variables are given a starting non-zero value, later this could be more sophisticated
+    Dual2DColVector variableValues = { 1, 1 };
+    Dual2DColVector prevValues = { 0, 0 };
 
-    while (true) {
-        Eigen::Matrix2d jacobian { { derivative(g, wrt(x), at(x, y)), derivative(g, wrt(y), at(x, y)) },
-            { derivative(h, wrt(x), at(x, y)), derivative(h, wrt(y), at(x, y)) } };
+    Eigen::Matrix2d jacobian;
+    Eigen::Vector2d evaluatedFunctionValues;
+    Eigen::Vector2d updatedVariableValues;
 
-        Eigen::Vector2d rightside { -(g(x, y).val), -(h(x, y).val) };
-        Eigen::Vector2d s = jacobian.colPivHouseholderQr().solve(rightside);
+    for (auto i = 0; i < MAXIMUM_ITERATIONS; i++) {
+        jacobian << derivative(f, wrt(variableValues.x()), at(variableValues.x(), variableValues.y(), xToZDistance)),
+            derivative(f, wrt(variableValues.y()), at(variableValues.x(), variableValues.y(), xToZDistance)),
+            derivative(
+                g, wrt(variableValues.x()), at(variableValues.x(), variableValues.y(), xToYDistance, yToZDistance)),
+            derivative(
+                g, wrt(variableValues.y()), at(variableValues.x(), variableValues.y(), xToYDistance, yToZDistance));
 
-        std::cout << "#############################Debug prints#############################\n";
+        evaluatedFunctionValues = Eigen::Vector2d { -(f(variableValues.x(), variableValues.y(), xToZDistance).val),
+            -(g(variableValues.x(), variableValues.y(), xToYDistance, yToZDistance).val) };
 
-        std::cout << std::format("n is x={},y={}", x.val, y.val) << std::endl;
-        std::cout << std::format("n+1 is x={},y={}", s[0], s[1]) << std::endl;
+        // Solving J_f(x_k)s_k = -f(x_k)
+        updatedVariableValues = jacobian.colPivHouseholderQr().solve(evaluatedFunctionValues);
 
-        if (abs(previousX - x.val) < error && abs(previousY - y.val) < error) {
-            std::cout << std::format("The solution is x={},y={}", x.val, y.val) << std::endl;
+        if (abs(prevValues.x() - variableValues.x()) < ERROR && abs(prevValues.y() - variableValues.y()) < ERROR) {
             break;
         }
 
-        previousX = x.val;
-        previousY = y.val;
-        x += s[0];
-        y += s[1];
+        prevValues = variableValues;
+
+        // Calculating x_k+1 = x_k + s_k
+        variableValues.x() += dual(updatedVariableValues[0]);
+        variableValues.y() += dual(updatedVariableValues[1]);
     }
 
-    // Vector2d x = { 1.0, 2.0 }; // Initial guess: t1, t2
-    //
-    // const int max_iter = 100;
-    // const double eps_f = 1e-8;
-    // const double eps_dx = 1e-8;
-    //
-    // std::cout << "Starting Newton-Raphson iterations...\n";
-    //
-    // for (int i = 0; i < max_iter; ++i) {
-    //     // Cast to autodiff type for Jacobian calculation
-    //     VectorX<dual> x_dual = x.cast<dual>();
-    //
-    //     // Evaluate function f(x) and compute Jacobian J(x)
-    //     VectorX<dual> fx = f(x_dual);
-    //     MatrixXd J = jacobian(f, wrt(x_dual), at(x_dual), fx);
-    //
-    //     // Solve for Newton step: J * delta = f(x)
-    //     VectorXd delta = J.colPivHouseholderQr().solve(fx.cast<double>());
-    //
-    //     // Update the estimate
-    //     x = x - delta;
-    //
-    //     // Output iteration info
-    //     std::cout << "Iter " << i << ": x = [" << x(0) << ", " << x(1) << "]"
-    //               << ", |f| = " << fx.norm() << ", |dx| = " << delta.norm() << std::endl;
-    //
-    //     // Check stopping criteria
-    //     if (fx.norm() < eps_f || delta.norm() < eps_dx) {
-    //         std::cout << "Converged.\n";
-    //         break;
-    //     }
-    // }
-    //
-    // std::cout << "\nFinal parameters:\n";
-    // std::cout << "t1 = " << x(0) << ", t2 = " << x(1) << "\n";
-    //
-    // // Evaluate the actual intersection points
-    // double r = std::sqrt(13.0);
-    // Vector2d p1 { r * std::cos(x(0)), r * std::sin(x(0)) };
-    // Vector2d p2 { x(1), x(1) * x(1) - 1.0 };
-    //
-    // std::cout << "\nIntersection point (should be the same for both):\n";
-    // std::cout << "r1(t1) = [" << p1(0) << ", " << p1(1) << "]\n";
-    // std::cout << "r2(t2) = [" << p2(0) << ", " << p2(1) << "]\n";
+    SOLVER_LOGGER->debug(std::format("The calculated result of the two variable equation system is: x: {}, y: {} \n",
+        variableValues.x().val, variableValues.y().val));
+
+    return { Coordinates2D { 0, 0 }, Coordinates2D { xToYDistance, 0 },
+        Coordinates2D { variableValues.x().val, variableValues.y().val } };
 }
+} // namespace Solver

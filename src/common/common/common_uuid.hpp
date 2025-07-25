@@ -8,7 +8,7 @@
 #include <random>
 #include <uuid.h>
 
-namespace common {
+namespace Common {
 
 using Uuid = uuids::uuid;
 

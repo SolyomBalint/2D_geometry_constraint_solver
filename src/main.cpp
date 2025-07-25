@@ -5,7 +5,6 @@
 
 // Custom headers
 #include "./utils/graph.hpp"
-#include "./utils/equation.hpp"
 #include "./constraint_solver/constraint_equation_solver.hpp"
 
 // Thirdparty headers not needed for rendering
@@ -96,11 +95,11 @@ int main(int argc, char* argv[])
     parseArguments(argparser, std::span<char*> { argv, static_cast<size_t>(argc) });
 
     MAIN_LOGGER->info("Graph tests beginning");
-    mathutils::Node node1;
-    mathutils::Node node2;
-    mathutils::Node node3;
-    mathutils::Node node4;
-    mathutils::Node node5;
+    MathUtils::Node node1;
+    MathUtils::Node node2;
+    MathUtils::Node node3;
+    MathUtils::Node node4;
+    MathUtils::Node node5;
 
     node1.m_edges.emplace_back(node2);
     node1.m_edges.emplace_back(node3);
@@ -119,9 +118,9 @@ int main(int argc, char* argv[])
     node5.m_edges.emplace_back(node4);
     node5.m_edges.emplace_back(node3);
 
-    std::vector<mathutils::Node> temp = { node1, node2, node3, node4, node5 };
+    std::vector<MathUtils::Node> temp = { node1, node2, node3, node4, node5 };
 
-    auto testGraph = std::make_unique<mathutils::UndirectedGraph>(temp);
+    auto testGraph = std::make_unique<MathUtils::UndirectedGraph>(temp);
 
     auto cutVertices = testGraph->getCutVertices();
     std::cout << "Cut vertices:" << '\n';
@@ -130,48 +129,9 @@ int main(int argc, char* argv[])
         std::cout << cutVertice.tempName << '\n';
     }
 
-    MAIN_LOGGER->info("Equation tests beginning");
-
-    std::shared_ptr<mathutils::Expression> expr1 = std::make_shared<mathutils::Constant>(10.0);
-    std::unordered_map<common::Uuid, double> map;
-    std::cout << *expr1.get() << '=' << expr1->evaluate(map) << '\n';
-
-    std::shared_ptr<mathutils::Expression> expr2 = std::make_shared<mathutils::Addition>(
-        std::make_shared<mathutils::Constant>(10.0), std::make_shared<mathutils::Constant>(10.0));
-    std::cout << *expr2.get() << '=' << expr2->evaluate(map) << '\n';
-
-    std::shared_ptr<mathutils::Expression> expr3 = std::make_shared<mathutils::Multiplication>(
-        std::make_shared<mathutils::Constant>(10.0), std::make_shared<mathutils::Constant>(10.0));
-    std::cout << *expr3.get() << '=' << expr3->evaluate(map) << '\n';
-
-    std::shared_ptr<mathutils::Expression> expr4 = std::make_shared<mathutils::Subtraction>(
-        std::make_shared<mathutils::Constant>(10.0), std::make_shared<mathutils::Constant>(10.0));
-    std::cout << *expr4.get() << '=' << expr4->evaluate(map) << '\n';
-
-    std::shared_ptr<mathutils::Expression> expr5 = std::make_shared<mathutils::Division>(
-        std::make_shared<mathutils::Constant>(16.0, std::make_shared<mathutils::Constant>(0.5)),
-        std::make_shared<mathutils::Constant>(2.0),
-        std::make_shared<mathutils::Constant>(2.0, std::make_shared<mathutils::Constant>(0.5)));
-    std::cout << *expr5.get() << '=' << expr5->evaluate(map) << '\n';
-
-    auto testVar = std::make_shared<mathutils::Variable>("x");
-    auto uuid = testVar->getUuid();
-
-    auto testVar2 = std::make_shared<mathutils::Variable>("y");
-    auto uuid2 = testVar2->getUuid();
-
-    std::shared_ptr<mathutils::Expression> expr6
-        = std::make_shared<mathutils::Division>(std::move(testVar), std::move(testVar2));
-
-    map[uuid] = 20;
-
-    map[uuid2] = 10;
-
-    std::cout << *expr6.get() << '=' << expr6.get()->evaluate(map) << '\n';
+    auto out = Solver::calculatePointToPointDistanceTriangle(8, 8, 8);
 
     auto gui = argparser.get<bool>("--gui");
-
-    testJacobian();
 
     if (gui) { }
 
