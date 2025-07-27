@@ -1,4 +1,5 @@
 MIT License
+======================
 
 Copyright (c) 2025 Sólyom Bálint
 
@@ -19,3 +20,18 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Third-Party Components
+======================
+
+Eigen Linear Algebra Library
+-----------------------------
+This project uses components from the Eigen library.
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+Copyright: The Eigen project and contributors
+Source: https://eigen.tuxfamily.org/
+License: Mozilla Public License 2.0
