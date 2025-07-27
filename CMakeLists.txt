@@ -2,24 +2,22 @@ cmake_minimum_required(VERSION 3.31)
 
 project(2d_geometry_constraint_solver)
 
+set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard" FORCE)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
-
-# Needed by spdlog to compile
-set(CMAKE_POSITION_INDEPENDENT_CODE true)
 
 message(STATUS "Setting CMAKE_DEVENV_PROFILE to $ENV{DEVENV_PROFILE}")
 set(CMAKE_DEVENV_PROFILE $ENV{DEVENV_PROFILE})
 
 configure_file(${CMAKE_CURRENT_LIST_DIR}/pyproject.toml.template ${CMAKE_CURRENT_LIST_DIR}/pyproject.toml)
 
+
 find_package(spdlog REQUIRED)
 find_package(stduuid REQUIRED)
 find_package(argparse REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(Python3 COMPONENTS Development Interpreter REQUIRED)
+find_package(Python COMPONENTS Development Interpreter REQUIRED)
 
 ######################## Downloading packages that are currently not available ########################
 
@@ -40,6 +38,40 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(autodiff)
 
 ######################## Downloading packages that are currently not available ########################
+
+
+######################## Optionally setting up nanobind for python binding generation ########################
+
+option(GENERATE_PYTHON_BINDINGS "Enable nanobind python bindings generation" ON)
+
+if(GENERATE_PYTHON_BINDINGS)
+    if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+        set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+        set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+    endif()
+
+    # Detect the installed nanobind package and import it into CMake
+    execute_process(
+      COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+      OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
+
+    message(STATUS "The nanobind root is ${nanobind_ROOT}")
+    find_package(nanobind CONFIG REQUIRED)
+
+    nanobind_add_module(equation_system_solver_binding NOMINSIZE
+                        src/python_bindings/equation_system_solver_binding.cpp
+                        src/constraint_solver/constraint_equation_solver.cpp)
+    target_include_directories(equation_system_solver_binding PRIVATE
+                src/common
+                ${spdlog_INCLUDE_DIRS}
+                ${autodiff_INCLUDE_DIRS}
+                ${Eigen3_INCLUDE_DIRS})
+
+    target_compile_definitions(equation_system_solver_binding PRIVATE SPDLOG_USE_STD_FORMAT)
+    target_link_libraries(equation_system_solver_binding PRIVATE spdlog::spdlog autodiff::autodiff Eigen3::Eigen)
+endif()
+
+######################## Optionally setting up nanobind for python binding generation ########################
 
 
 # IMPORTANT NOTE: Currently this project outputs only one binary. There is no
