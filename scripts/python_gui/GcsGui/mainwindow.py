@@ -40,9 +40,8 @@ class MainWindow(Gtk.ApplicationWindow):
         # Initialize the data containers. They should now about each other for some usecases
         # Note that it is not good practice to bind the lifetime of these objects to the lifetime of the MainWindow
         # But it is sufficient for our demo goals.
-        self.shape_data = drawmodel.ShapeManager(None)
+        self.shape_data = drawmodel.ShapeManager()
         self.gcs_data = gcs.GeometricConstraintSystem(self.shape_data)
-        self.shape_data.gcs = self.gcs_data
 
         # Create drawing area
         drawing_area = drawmodelview.DrawingLayout(self.shape_data)

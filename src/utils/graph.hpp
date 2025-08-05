@@ -79,7 +79,7 @@ public:
     std::vector<Node> getCutVertices() override;
 
     explicit UndirectedGraph(std::vector<Node> inList)
-        : m_adjacencyList_(std::move(inList))
+        : m_adjacencyList_(inList)
     {
     }
 

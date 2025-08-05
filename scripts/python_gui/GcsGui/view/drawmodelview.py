@@ -91,10 +91,34 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
         self.connect("button-release-event", self.on_button_release)
         self.connect("motion-notify-event", self.on_motion_notify)
 
-    def on_draw(self, wid, cr: cairo.Context):
+    def on_draw(self, widget, cr: cairo.Context):
 
+        ### Drawing the grid
+        width = widget.get_allocated_width()
+        height = widget.get_allocated_height()
+
+        # Grid parameters
+        grid_size = 40
+
+        # Set grid line properties
+        cr.set_source_rgb(0.8, 0.8, 0.8)  # Light gray
+        cr.set_line_width(1)
+
+        # Draw vertical lines
+        for x in range(0, width, grid_size):
+            cr.move_to(x, 0)
+            cr.line_to(x, height)
+
+        # Draw horizontal lines
+        for y in range(0, height, grid_size):
+            cr.move_to(0, y)
+            cr.line_to(width, y)
+
+        cr.stroke()
+
+        ### Drawing the shapes
         for shape in self.shape_manager.shape_buffer:
-            shape.on_draw(wid, cr)
+            shape.on_draw(widget, cr)
 
     def on_button_press(self, widget, event):
 
@@ -122,7 +146,7 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
             err = constraint_dialog.run()
 
             if err == Gtk.ResponseType.OK:
-                pass
+                print(constraint_dialog.get_float())
 
             for selected in self.selected_items:
                 selected.colour = common.RgbColour(0.0, 0.0, 0.0)  # Note this deletes the original colour of shape

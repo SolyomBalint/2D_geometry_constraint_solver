@@ -5,7 +5,6 @@ from dataclasses import dataclass
 import cairo
 
 from ..common import commondatastructs as common
-from . import gcs
 
 
 @dataclass
@@ -15,9 +14,8 @@ class CanvasCoord:
 
 
 class ShapeManager:
-    def __init__(self, gcs):
+    def __init__(self):
         self.shape_buffer: list = []
-        self.gcs: gcs.GeometricConstraintSystem = gcs
 
 
 class Drawable(ABC):

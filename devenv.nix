@@ -1,13 +1,18 @@
-{ pkgs, lib, config, inputs, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  inputs,
+  ...
+}:
 let
-  pkgs_unstable =
-    import inputs.unstable_nixkpgs { system = pkgs.stdenv.system; };
-in {
+  pkgs_unstable = import inputs.unstable_nixkpgs { system = pkgs.stdenv.system; };
+in
+{
   cachix.enable = true;
   cachix.pull = [ "pre-commit-hooks" ];
   # Environmental variables
-  env.GREET =
-    "Welcome to 2D geometry constraint solver development environment!";
+  env.GREET = "Welcome to 2D geometry constraint solver development environment!";
   env.CONAN_HOME = "${config.devenv.root}/.conan2";
 
   # env.DEVENV_GCC = "${pkgs_unstable.libgcc.out}/bin/gcc";
