@@ -12,17 +12,14 @@ namespace Common {
 
 using Uuid = uuids::uuid;
 
-inline Uuid generateUuidMt19937()
-{
-    std::random_device randomDevice;
-    auto seedData = std::array<int, std::mt19937::state_size> {};
-    std::generate(std::begin(seedData), std::end(seedData), std::ref(randomDevice));
-    std::seed_seq seq(std::begin(seedData), std::end(seedData));
-    std::mt19937 generator(seq);
-    uuids::uuid_random_generator gen { generator };
-
-    return gen();
-}
+/**
+ * @brief Create a UUID based on the Mt19937 algorithm.
+ *
+ * @note the algorithm is seeded once per program run with std::random_device
+ *
+ * @return the generated UUID
+ */
+Uuid generateUuidMt19937();
 } // namespace common::uuid
 
 #endif // COMMON_UUID_HPP

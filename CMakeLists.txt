@@ -42,7 +42,7 @@ FetchContent_MakeAvailable(autodiff)
 
 ######################## Optionally setting up nanobind for python binding generation ########################
 
-option(GENERATE_PYTHON_BINDINGS "Enable nanobind python bindings generation" ON)
+option(GENERATE_PYTHON_BINDINGS "Enable nanobind python bindings generation" OFF)
 
 if(GENERATE_PYTHON_BINDINGS)
     if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -81,7 +81,8 @@ endif()
 
 add_executable(${PROJECT_NAME}  src/main.cpp
                                 src/utils/graph.cpp
-                                src/constraint_solver/constraint_equation_solver.cpp)
+                                src/constraint_solver/constraint_equation_solver.cpp
+                                src/common/common/common_uuid.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ./include
             src/common
