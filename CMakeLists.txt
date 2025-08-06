@@ -80,12 +80,12 @@ endif()
 # correct linking
 
 add_executable(${PROJECT_NAME}  src/main.cpp
-                                src/utils/graph.cpp
                                 src/constraint_solver/constraint_equation_solver.cpp
                                 src/common/common/common_uuid.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ./include
             src/common
+            src/utils
             ${spdlog_INCLUDE_DIRS}
             ${argparse_INCLUDE_DIRS}
             ${stduuid_INCLUDE_DIRS}

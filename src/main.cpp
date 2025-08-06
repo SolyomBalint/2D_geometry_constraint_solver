@@ -4,7 +4,6 @@
 #include <format>
 
 // Custom headers
-#include "./utils/graph.hpp"
 #include "./constraint_solver/constraint_equation_solver.hpp"
 
 // Thirdparty headers not needed for rendering
@@ -18,6 +17,8 @@
 #include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
+
+#include "./utils/graphs/graph_impls/default.hpp"
 
 namespace {
 // NOLINTNEXTLINE note this should be investigated
@@ -94,42 +95,15 @@ int main(int argc, char* argv[])
     initParserArgumnets(argparser);
     parseArguments(argparser, std::span<char*> { argv, static_cast<size_t>(argc) });
 
-    MAIN_LOGGER->info("Graph tests beginning");
-    MathUtils::Node node1;
-    MathUtils::Node node2;
-    MathUtils::Node node3;
-    MathUtils::Node node4;
-    MathUtils::Node node5;
-
-    node1.m_edges.emplace_back(node2);
-    node1.m_edges.emplace_back(node3);
-
-    node2.m_edges.emplace_back(node1);
-    node2.m_edges.emplace_back(node3);
-
-    node3.m_edges.emplace_back(node1);
-    node3.m_edges.emplace_back(node2);
-    node3.m_edges.emplace_back(node4);
-    node3.m_edges.emplace_back(node5);
-
-    node4.m_edges.emplace_back(node5);
-    node4.m_edges.emplace_back(node3);
-
-    node5.m_edges.emplace_back(node4);
-    node5.m_edges.emplace_back(node3);
-
-    std::vector<MathUtils::Node> temp = { node1, node2, node3, node4, node5 };
-
-    auto testGraph = std::make_unique<MathUtils::UndirectedGraph>(temp);
-
-    auto cutVertices = testGraph->getCutVertices();
-    std::cout << "Cut vertices:" << '\n';
-
-    for (auto& cutVertice : cutVertices) {
-        std::cout << cutVertice.tempName << '\n';
-    }
-
     auto out = Solver::calculatePointToPointDistanceTriangle(8, 8, 8);
+
+    MathUtils::Graph<int, int> testGraph {};
+
+    auto node1 = testGraph.addNode(std::make_shared<int>(2));
+    auto node2 = testGraph.addNode(std::make_shared<int>(3));
+    auto edge1 = testGraph.addEdge(node1, node2, std::make_shared<int>(5));
+
+    std::cout << *(edge1.getStoredObj().get()) << std::endl;
 
     auto gui = argparser.get<bool>("--gui");
 
