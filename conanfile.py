@@ -11,6 +11,7 @@ class ProjectRecipe(ConanFile):
         self.requires("stduuid/[~1.2]")
         self.requires("argparse/3.2")
         self.requires("eigen/[~3.4]")
+        self.requires("ogdf/2023.09")
 
     def configure(self):
         self.options["stduuid"].with_cxx20_span = True

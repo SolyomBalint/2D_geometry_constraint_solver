@@ -77,6 +77,12 @@ public:
 
     std::vector<NodeType> getCutVertices() const;
 
+    std::pair<NodeType&, NodeType&> getSeparationPairs() const
+    {
+        // Skeleton implementation
+        throw std::logic_error("Method not implemented");
+    }
+
 private:
     // Adjacency list with explicit access
     std::unordered_map<DefaultNode::NodeId, std::unordered_set<DefaultEdge::EdgeId>> adjacencyLists;

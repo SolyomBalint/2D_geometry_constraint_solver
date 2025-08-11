@@ -18,7 +18,11 @@
 #include <string>
 #include <vector>
 
-#include "./utils/graphs/graph_impls/default.hpp"
+// #include "./utils/graphs/graph_impls/default.hpp"
+#include "./utils/graphs/graph_impls/ogdf_wrapper.hpp"
+
+#include <ogdf/basic/Graph.h>
+#include <ogdf/basic/extended_graph_alg.h>
 
 namespace {
 // NOLINTNEXTLINE note this should be investigated
@@ -99,11 +103,93 @@ int main(int argc, char* argv[])
 
     MathUtils::Graph<int, int> testGraph {};
 
-    auto node1 = testGraph.addNode(std::make_shared<int>(2));
-    auto node2 = testGraph.addNode(std::make_shared<int>(3));
-    auto edge1 = testGraph.addEdge(node1, node2, std::make_shared<int>(5));
+    auto node1 = testGraph.addNode(std::make_shared<int>(1));
+    auto node2 = testGraph.addNode(std::make_shared<int>(2));
+    auto node3 = testGraph.addNode(std::make_shared<int>(3));
+    auto node4 = testGraph.addNode(std::make_shared<int>(4));
+    auto node5 = testGraph.addNode(std::make_shared<int>(5));
 
-    std::cout << *(edge1.getStoredObj().get()) << std::endl;
+    auto edge1 = testGraph.addEdge(node1, node2, std::make_shared<int>(1));
+    auto edge2 = testGraph.addEdge(node1, node3, std::make_shared<int>(1));
+
+    auto edge3 = testGraph.addEdge(node3, node2, std::make_shared<int>(1));
+
+    auto edge4 = testGraph.addEdge(node3, node4, std::make_shared<int>(1));
+    auto edge5 = testGraph.addEdge(node3, node5, std::make_shared<int>(1));
+    auto edge6 = testGraph.addEdge(node4, node5, std::make_shared<int>(1));
+
+    auto outNodes = testGraph.getCutVertices();
+
+    std::cout << outNodes.size() << std::endl;
+    std::cout << *(outNodes[0].getStoredObj().get()) << std::endl;
+
+    MathUtils::Graph<int, int> testGraphSeparationPairs {};
+    auto node21 = testGraphSeparationPairs.addNode(std::make_shared<int>(1));
+    auto node22 = testGraphSeparationPairs.addNode(std::make_shared<int>(2));
+    auto node23 = testGraphSeparationPairs.addNode(std::make_shared<int>(3));
+    auto node24 = testGraphSeparationPairs.addNode(std::make_shared<int>(4));
+
+    auto edge21 = testGraphSeparationPairs.addEdge(node21, node22, std::make_shared<int>(8));
+    auto edge22 = testGraphSeparationPairs.addEdge(node21, node23, std::make_shared<int>(9));
+    auto edge23 = testGraphSeparationPairs.addEdge(node22, node23, std::make_shared<int>(10));
+    auto edge24 = testGraphSeparationPairs.addEdge(node22, node24, std::make_shared<int>(11));
+    auto edge25 = testGraphSeparationPairs.addEdge(node23, node24, std::make_shared<int>(12));
+
+    MathUtils::Graph<int, int>::NodeType outNode1; // Actual objects, not pointers
+    MathUtils::Graph<int, int>::NodeType outNode2;
+
+    testGraphSeparationPairs.getSeparationPairs(&outNode1, &outNode2); // Pass addresses
+
+    testGraphSeparationPairs.separateByVerticesByDuplication({ outNode1, outNode2 });
+
+    ogdf::Graph test {};
+
+    auto nodex = test.newNode(5);
+    auto nodey = test.newNode(6);
+    auto nodez = test.newNode(7);
+    test.newEdge(nodex, nodey);
+
+    ogdf::List<ogdf::node> testList {};
+    testList.pushBack(nodex);
+    testList.pushBack(nodey);
+    testList.search(nodex);
+
+    ogdf::Graph subGraph {};
+    ogdf::ListIterator<ogdf::node> it { testList.begin() };
+    ogdf::inducedSubGraph(test, it, subGraph);
+
+    // std::cout << test.edges.size() << std::endl;
+    std::cout << test.nodes.head()->index() << std::endl;
+
+    // std::cout << subGraph.edges.size() << std::endl;
+    std::cout << subGraph.nodes.head()->index() << std::endl;
+
+    //
+    // ogdf::Graph test2 {};
+    // test2.newNode(test.nodes.tail()->index());
+    //
+    // test2.delNode(test.nodes.tail());
+    //
+    // std::cout << test.nodes.tail()->index() << "\n";
+    // std::cout << test2.nodes.tail()->index() << "\n";
+
+    // this fails
+    // test.delNode(test2.nodes.tail());
+
+    // ogdf::List<ogdf::node> nodeTest {};
+    // test.allNodes(nodeTest);
+    //
+    // std::cout << "\n";
+    //
+    // std::cout << nodeTest.size() << "\n";
+    // std::cout << test.nodes.size() << "\n";
+    //
+    // std::cout << "\n";
+    //
+    // nodeTest.clear();
+    //
+    // std::cout << nodeTest.size() << "\n";
+    // std::cout << test.nodes.size() << "\n";
 
     auto gui = argparser.get<bool>("--gui");
 

@@ -2,6 +2,7 @@
 #define GRAPH_INTERFACE_HPP
 
 #include <concepts>
+#include <type_traits>
 #include <memory>
 #include <ranges>
 #include <utility>
@@ -30,7 +31,16 @@ public:
 
     auto getId() const { return impl_.getId(); }
 
+    /**
+     * @brief This function is meant to make writing wrappers easier, do not depend in this otherwise changing backend
+     * may result in breaking code
+     *
+     * @return the stored node implementation type
+     */
+    auto getImpl() const { return impl_; }
+
     std::shared_ptr<StoredObjectType> getStoredObj() { return storedObject; }
+    std::shared_ptr<StoredObjectType> getStoredObj() const { return storedObject; }
 };
 
 template <typename EdgeImpl, typename StoredObjectType = void> class EdgeInterface {
@@ -53,6 +63,14 @@ public:
     EdgeInterface& operator=(EdgeInterface&&) = default;
 
     auto getId() const { return impl_.getId(); }
+
+    /**
+     * @brief This function is meant to make writing wrappers easier, do not depend in this otherwise changing backend
+     * may result in breaking code
+     *
+     * @return the stored edge implementation type
+     */
+    auto getImpl() const { return impl_; }
 
     std::shared_ptr<StoredObjectType> getStoredObj() { return storedObject; }
 };
@@ -135,6 +153,11 @@ concept GraphImplRequirements = requires(
 
     { graph_t.getCutVertices() } -> std::ranges::range;
 
+    {
+        graph_t.getSeparationPairs(
+            std::declval<typename GraphType::NodeType*>(), std::declval<typename GraphType::NodeType*>())
+    } -> std::same_as<void>;
+
     requires std::same_as<std::ranges::range_value_t<decltype(graph_t.getCutVertices())>, typename GraphType::NodeType>;
 };
 
@@ -146,6 +169,7 @@ private:
     GraphImpl impl_;
 
 public:
+    using GraphType = GraphInterface<GraphImpl, NodeImpl, NodeStoredObject, EdgeImpl, EdgeStoredObject>;
     GraphInterface() = default;
 
     GraphInterface(const GraphInterface&) = delete;
@@ -164,6 +188,15 @@ public:
     }
 
     auto getCutVertices() const { return impl_.getCutVertices(); }
+
+    void getSeparationPairs(NodeType* outNodeOne, NodeType* outNoteTwo) const
+    {
+        return impl_.getSeparationPairs(outNodeOne, outNoteTwo);
+    }
+    std::vector<GraphImpl> separateByVerticesByDuplication(const std::vector<NodeType>& separatorNodes)
+    {
+        return impl_.separateByVerticesByDuplication(separatorNodes);
+    }
 };
 
 }

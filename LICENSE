@@ -1,37 +1,132 @@
-MIT License
-======================
+GNU GENERAL PUBLIC LICENSE
+==========================
+
+This project is licensed under the GNU General Public License v3.0 or later.
+
+The requirement to use GPL comes from the dependency on OGDF (Open Graph Drawing Framework),
+which is licensed under GPL-2.0-or-later/GPL-3.0-or-later.
 
 Copyright (c) 2025 Sólyom Bálint
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-Third-Party Components
-======================
 
-Eigen Linear Algebra Library
------------------------------
-This project uses components from the Eigen library.
+Third-Party Components and Dependencies
+========================================
 
-This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0. If a copy of the MPL was not distributed with this
-file, You can obtain one at http://mozilla.org/MPL/2.0/.
+This project uses the following third-party libraries:
 
-Copyright: The Eigen project and contributors
-Source: https://eigen.tuxfamily.org/
-License: Mozilla Public License 2.0
+Core Dependencies (from conanfile.py)
+--------------------------------------
+
+1. OGDF (Open Graph Drawing Framework) - v2023.09
+   License: GPL-2.0-or-later / GPL-3.0-or-later
+   Website: https://ogdf.uos.de/
+   Note: This is the primary reason this project must be GPL-licensed.
+
+2. Eigen Linear Algebra Library - v3.4.x
+   License: Mozilla Public License 2.0 (MPL-2.0)
+   Website: https://eigen.tuxfamily.org/
+   Note: Configured with MPL2_only=True to use only MPL-2.0 licensed portions.
+
+3. spdlog - v1.15.x
+   License: MIT
+   Website: https://github.com/gabime/spdlog
+
+4. stduuid - v1.2.x
+   License: MIT
+   Website: https://github.com/mariusbancila/stduuid
+
+5. argparse - v3.2
+   License: MIT
+   Website: https://github.com/p-ranav/argparse
+
+6. nlohmann_json - v3.11.3
+   License: MIT
+   Website: https://github.com/nlohmann/json
+
+7. autodiff - v1.1.2 (via CMake FetchContent)
+   License: MIT
+   Copyright: Allan Leal (2018-2024)
+   Website: https://github.com/autodiff/autodiff
+
+8. nanobind (Python bindings)
+   License: BSD-3-Clause
+   Website: https://github.com/wjakob/nanobind
+
+
+Transitive Dependencies
+------------------------
+
+The following libraries are transitive dependencies (dependencies of dependencies):
+
+1. COIN-OR Libraries (CoinUtils, Clp, Osi)
+   License: Eclipse Public License 2.0 (EPL-2.0)
+   Website: https://www.coin-or.org/
+   Note: Used by OGDF
+
+2. pugixml
+   License: MIT
+   Website: https://pugixml.org/
+
+3. zlib
+   License: Zlib License
+   Website: https://www.zlib.net/
+
+4. bzip2
+   License: bzip2-1.0.6
+   Website: https://sourceware.org/bzip2/
+
+
+Build Tool Dependencies
+-----------------------
+
+The following build tools are used during compilation but are not
+distributed with the binary:
+
+1. pkg-config
+   License: ISC License
+
+2. meson
+   License: Apache-2.0
+
+3. ninja
+   License: Apache-2.0
+
+4. gnu-config
+   License: GPL-3.0-or-later with autoconf-special-exception
+
+
+License Summary
+===============
+
+Due to the dependency on OGDF (GPL-2.0-or-later/GPL-3.0-or-later), this entire
+project is licensed under GPL-3.0-or-later.
+
+The majority of other dependencies use permissive licenses (MIT, BSD, Apache, etc.)
+which are compatible with the GPL.
+
+Eigen uses MPL-2.0, which is a weak copyleft license and is also compatible with GPL.
+
+COIN-OR uses EPL-2.0, which is compatible with GPL as per the Eclipse Foundation's
+compatibility statement.
+
+
+Full License Text
+=================
+
+For the complete text of the GNU General Public License v3.0, see:
+https://www.gnu.org/licenses/gpl-3.0.txt
+
+Or refer to the file GPL-3.0.txt in this repository (if provided).

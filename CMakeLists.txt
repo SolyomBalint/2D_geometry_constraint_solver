@@ -14,6 +14,7 @@ configure_file(${CMAKE_CURRENT_LIST_DIR}/pyproject.toml.template ${CMAKE_CURRENT
 
 
 find_package(spdlog REQUIRED)
+find_package(ogdf REQUIRED)
 find_package(stduuid REQUIRED)
 find_package(argparse REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -87,13 +88,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE ./include
             src/common
             src/utils
             ${spdlog_INCLUDE_DIRS}
+            ${ogdf_INCLUDE_DIRS}
             ${argparse_INCLUDE_DIRS}
             ${stduuid_INCLUDE_DIRS}
             ${autodiff_INCLUDE_DIRS}
             ${Eigen3_INCLUDE_DIRS})
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE SPDLOG_USE_STD_FORMAT LIBUUID_CPP20_OR_GREATER)
-target_link_libraries(${PROJECT_NAME} PRIVATE   stduuid::stduuid argparse::argparse
+target_link_libraries(${PROJECT_NAME} PRIVATE   stduuid::stduuid argparse::argparse ogdf::ogdf
                                                 spdlog::spdlog autodiff::autodiff Eigen3::Eigen)
 
 # Explanation why these flags are used:
