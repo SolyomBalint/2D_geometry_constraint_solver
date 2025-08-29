@@ -2,12 +2,10 @@
 #define GRAPH_INTERFACE_HPP
 
 #include <concepts>
-#include <type_traits>
 #include <memory>
 #include <ranges>
 #include <utility>
 #include <vector>
-#include <algorithm>
 
 namespace MathUtils {
 
@@ -166,7 +164,7 @@ template <typename GraphImpl, typename NodeImpl, typename NodeStoredObject, type
     requires GraphImplRequirements<GraphImpl, NodeImpl, NodeStoredObject, EdgeImpl, EdgeStoredObject>
 class GraphInterface {
 private:
-    GraphImpl impl_;
+    GraphImpl impl_ {};
 
 public:
     using GraphType = GraphInterface<GraphImpl, NodeImpl, NodeStoredObject, EdgeImpl, EdgeStoredObject>;

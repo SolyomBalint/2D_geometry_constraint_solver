@@ -50,7 +50,7 @@ DefaultUndirectedGraph<NodeStoredObject, EdgeStoredObject>::getCutVertices() con
     throw std::logic_error("Method not implemented");
 }
 
-template <typename NodeStoredObj, typename EdgeStoredObj>
+template <NodeStoredObj, EdgeStoredObj>
 using Graph = GraphInterface<DefaultUndirectedGraph<NodeStoredObj, EdgeStoredObj>, DefaultNode, NodeStoredObj,
     DefaultEdge, EdgeStoredObj>;
 

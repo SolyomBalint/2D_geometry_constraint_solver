@@ -26,30 +26,38 @@ const auto OGDF_GRAPH_LOGGER = spdlog::stdout_color_mt("OGDF_GRAPH");
 class OGDFNodeImpl {
 private:
     ogdf::node node_;
+    ogdf::node optPairNode = nullptr;
 
 public:
     OGDFNodeImpl() = default;
     OGDFNodeImpl(ogdf::node n)
-        : node_(n)
+        : node_ { n }
     {
     }
 
     int getId() const { return node_->index(); }
     ogdf::node getNode() const { return node_; }
+    ogdf::node getPairNode() const { return optPairNode; }
+    void setPairNode(ogdf::node pair) { optPairNode = pair; }
 };
 
 class OGDFEdgeImpl {
 private:
     ogdf::edge edge_;
+    bool virtualEdge;
 
 public:
-    OGDFEdgeImpl(ogdf::edge edge)
-        : edge_(edge)
+    OGDFEdgeImpl(ogdf::edge edge, bool isVirtualEdge = false)
+        : edge_ { edge }
+        , virtualEdge { isVirtualEdge }
     {
     }
 
     int getId() const { return edge_->index(); }
+
     ogdf::edge getEdge() const { return edge_; }
+
+    bool isVirtual() const { return virtualEdge; }
 };
 
 template <typename NodeStoredObject, typename EdgeStoredObject> class OGDFGraphImpl {
@@ -62,7 +70,69 @@ private:
     std::unordered_map<int, NodeType> nodeMap_;
     std::unordered_map<int, EdgeType> edgeMap_;
 
+    OGDFGraphImpl createMappedSubGraph(const std::vector<ogdf::node>& currentlyVisitedNodes,
+        std::vector<ogdf::node>& originalSeparatorNodes, bool createVirtual)
+    {
+        using node = ogdf::node;
+        using edge = ogdf::edge;
+        OGDF_GRAPH_LOGGER->debug(createVirtual);
+
+        ogdf::NodeArray<node> originalToNewNodeMapping {};
+        ogdf::EdgeArray<ogdf::edge> originalToNewEdgeMapping {};
+
+        ogdf::List<node> tempList {};
+        for (auto n : currentlyVisitedNodes) {
+            tempList.pushBack(n);
+        }
+
+        OGDFGraphImpl subGraph;
+
+        ogdf::ListIterator<ogdf::node> it { tempList.begin() };
+        ogdf::inducedSubGraph(graph_, it, subGraph.graph_, originalToNewNodeMapping, originalToNewEdgeMapping);
+
+        for (const auto& n : currentlyVisitedNodes) {
+            node inducedNode = originalToNewNodeMapping[n];
+            OGDF_GRAPH_LOGGER->debug(std::format("original node index: {}", n->index()));
+
+            subGraph.nodeMap_.try_emplace(
+                inducedNode->index(), NodeType { OGDFNodeImpl { inducedNode }, nodeMap_[n->index()].getStoredObj() });
+        }
+
+        for (auto& [index, edgeValue] : edgeMap_) {
+            auto originalEdge = edgeValue.getImpl().getEdge();
+            edge inducedEdge = originalToNewEdgeMapping[originalEdge];
+
+            if (inducedEdge) {
+                bool isVirtual = false;
+
+                // TODO currently only separation pairs and cut vertex are supported
+                if (originalSeparatorNodes.size() == 2
+                    && isEdgeBetweenNodes(originalEdge, originalSeparatorNodes[0], originalSeparatorNodes[1])) {
+                    isVirtual = true;
+                }
+
+                OGDF_GRAPH_LOGGER->debug(std::format("original edge index: {}", originalEdge->index()));
+                if (isVirtual && createVirtual) {
+                    OGDF_GRAPH_LOGGER->debug("Virtual edge added");
+                }
+
+                subGraph.edgeMap_.try_emplace(inducedEdge->index(),
+                    EdgeType { OGDFEdgeImpl { inducedEdge, isVirtual && createVirtual }, edgeValue.getStoredObj() });
+            }
+        }
+
+        return subGraph;
+    };
+
 public:
+    bool isEdgeBetweenNodes(const ogdf::edge& edgeToCheck, const ogdf::node& firstNode, const ogdf::node& secondNode)
+    {
+        ogdf::node edgeSource = edgeToCheck->source();
+        ogdf::node edgeTarget = edgeToCheck->target();
+
+        return (edgeSource == firstNode && edgeTarget == secondNode)
+            || (edgeSource == secondNode && edgeTarget == firstNode);
+    }
     NodeType& addNode(std::shared_ptr<NodeStoredObject> obj)
     {
         ogdf::node newNode = graph_.newNode();
@@ -143,7 +213,7 @@ public:
     {
         using node = ogdf::node;
 
-        std::vector<ogdf::Graph> subGraphs {};
+        std::vector<OGDFGraphImpl> subGraphs {};
 
         auto numberOfNodes = graph_.nodes.size();
         std::vector<node> ogdfSepNodes {};
@@ -154,7 +224,6 @@ public:
 
         std::vector<node> absoluteVisitedNodes { ogdfSepNodes };
 
-        OGDF_GRAPH_LOGGER->debug(std::format("Before while loop, number of total nodes: {}", numberOfNodes));
         while (numberOfNodes != absoluteVisitedNodes.size()) {
             std::vector<node> currentlyVisitedNodes { ogdfSepNodes };
             std::stack<node> nodeStack {};
@@ -167,77 +236,42 @@ public:
                 nodeStack.push(nextNode);
             }
 
-            OGDF_GRAPH_LOGGER->debug("Before dfs");
             while (!nodeStack.empty()) {
                 auto currentNode = nodeStack.top();
                 nodeStack.pop();
 
-                // FIX 1: Check if node is already visited before adding
                 bool alreadyInCurrently
                     = std::ranges::find(currentlyVisitedNodes, currentNode) != currentlyVisitedNodes.end();
                 bool alreadyInAbsolute
                     = std::ranges::find(absoluteVisitedNodes, currentNode) != absoluteVisitedNodes.end();
 
                 if (alreadyInCurrently || alreadyInAbsolute) {
-                    continue; // Skip this node if already processed
+                    continue;
                 }
 
                 currentlyVisitedNodes.push_back(currentNode);
                 absoluteVisitedNodes.push_back(currentNode);
 
-                OGDF_GRAPH_LOGGER->debug("Before dfs edge iteration");
-
                 for (auto edge : currentNode->adjEntries) {
                     auto adjNode = edge->twinNode();
 
-                    OGDF_GRAPH_LOGGER->debug(std::format("Current Node: {}", adjNode->index()));
-
-                    // FIX 2: Check against both currentlyVisitedNodes AND absoluteVisitedNodes
                     bool foundInCurrently
                         = std::ranges::find(currentlyVisitedNodes, adjNode) != currentlyVisitedNodes.end();
                     bool foundInAbsolute
                         = std::ranges::find(absoluteVisitedNodes, adjNode) != absoluteVisitedNodes.end();
 
                     if (!foundInCurrently && !foundInAbsolute) {
-                        OGDF_GRAPH_LOGGER->debug("after dfs node visit check");
-                        nodeStack.push(adjNode); // FIX 3: Use adjNode consistently
+                        nodeStack.push(adjNode);
                     }
                 }
             }
 
-            ogdf::Graph subGraph {};
-            ogdf::NodeArray<node> originalToNewNodeMapping {};
-            ogdf::EdgeArray<ogdf::edge> originalToNewEdgeMapping {};
-
-            ogdf::List<node> tempList {};
-            for (auto n : currentlyVisitedNodes) {
-                tempList.pushBack(n);
-            }
-            ogdf::ListIterator<ogdf::node> it { tempList.begin() };
-            ogdf::inducedSubGraph(graph_, it, subGraph, originalToNewNodeMapping, originalToNewEdgeMapping);
-
-            ogdf::List<node> nodeInfoList {};
-            subGraph.allNodes(nodeInfoList);
-            for (auto n : nodeInfoList) {
-                OGDF_GRAPH_LOGGER->debug(std::format("subgraph node index: {}", n->index()));
-            }
-
-            ogdf::List<ogdf::edge> edgeInfoList {};
-            subGraph.allEdges(edgeInfoList);
-            for (auto e : edgeInfoList) {
-                OGDF_GRAPH_LOGGER->debug(
-                    std::format("subgraph edge ends: {} - {}", e->source()->index(), e->target()->index()));
-            }
-
-            subGraphs.push_back(std::move(subGraph));
-            OGDF_GRAPH_LOGGER->debug("subgraph created");
-            OGDF_GRAPH_LOGGER->debug(std::format("number of total visited nodes: {}", absoluteVisitedNodes.size()));
+            // TODO think through virtual edge creation, it may be faulty
+            subGraphs.push_back(createMappedSubGraph(currentlyVisitedNodes, ogdfSepNodes, subGraphs.size() > 0));
+            OGDF_GRAPH_LOGGER->debug("subgraph created after separation");
         }
 
-        // FIX 4: Don't forget to return the result!
-        std::vector<OGDFGraphImpl> result;
-        // TODO: Convert subGraphs to OGDFGraphImpl instances
-        return result;
+        return subGraphs;
     }
 };
 
@@ -246,7 +280,6 @@ static_assert(GraphImplRequirements<OGDFGraphImpl<int, int>, OGDFNodeImpl, int, 
 template <typename NodeStoredObj, typename EdgeStoredObj>
 using Graph = GraphInterface<OGDFGraphImpl<NodeStoredObj, EdgeStoredObj>, OGDFNodeImpl, NodeStoredObj, OGDFEdgeImpl,
     EdgeStoredObj>;
-
 } // namespace MathUtils
 
 #endif // OGDF_GRAPH_WRAPPER_HPP
