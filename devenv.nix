@@ -19,6 +19,7 @@ in
   # env.DEVENV_GPP = "${pkgs_unstable.libgcc.out}/bin/g++";
 
   scripts.build_linux_gcc_debug.exec = ''
+    echo "If the script fails on nixos run it in an fhs shell"
     conan install $DEVENV_ROOT --remote=conancenter --build=missing \
     -pr $DEVENV_ROOT/conan_profiles/Linux/LinuxGccStd20DebugProfile
 
@@ -33,6 +34,7 @@ in
   '';
 
   scripts.build_linux_gcc_release.exec = ''
+    echo "If the script fails on nixos run it in an fhs shell"
     conan install $DEVENV_ROOT --remote=conancenter --build=missing \
     -pr $DEVENV_ROOT/conan_profiles/Linux/LinuxGccStd20ReleaseProfile
 
