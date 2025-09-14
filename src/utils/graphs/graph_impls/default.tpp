@@ -4,7 +4,8 @@ namespace MathUtils {
 
 template <typename NodeStoredObject, typename EdgeStoredObject>
 typename DefaultUndirectedGraph<NodeStoredObject, EdgeStoredObject>::NodeType&
-DefaultUndirectedGraph<NodeStoredObject, EdgeStoredObject>::addNode(std::shared_ptr<NodeStoredObject> obj)
+DefaultUndirectedGraph<NodeStoredObject, EdgeStoredObject>::addNode(
+    std::shared_ptr<NodeStoredObject> obj)
 {
     auto nodeId = Common::generateUuidMt19937();
     auto [it, ret] = nodes.emplace(nodeId, NodeType { { nodeId }, obj });
@@ -17,7 +18,8 @@ DefaultUndirectedGraph<NodeStoredObject, EdgeStoredObject>::addNode(std::shared_
 template <typename NodeStoredObject, typename EdgeStoredObject>
 typename DefaultUndirectedGraph<NodeStoredObject, EdgeStoredObject>::EdgeType&
 DefaultUndirectedGraph<NodeStoredObject, EdgeStoredObject>::addEdge(
-    const NodeType& node1, const NodeType& node2, std::shared_ptr<EdgeStoredObject> edgeObj)
+    const NodeType& node1, const NodeType& node2,
+    std::shared_ptr<EdgeStoredObject> edgeObj)
 {
     const auto node1Id = node1.getId();
     const auto node2Id = node2.getId();
@@ -27,7 +29,9 @@ DefaultUndirectedGraph<NodeStoredObject, EdgeStoredObject>::addEdge(
         auto node2It = nodes.find(node2Id);
 
         if (node1It == nodes.end() or node2It == nodes.end()) {
-            throw std::invalid_argument("Input nodes do not exist in the graph, it is impossible to create the edge");
+            throw std::invalid_argument(
+                "Input nodes do not exist in the graph, it is impossible to "
+                "create the edge");
         }
     }
 
@@ -43,15 +47,18 @@ DefaultUndirectedGraph<NodeStoredObject, EdgeStoredObject>::addEdge(
 }
 
 template <typename NodeStoredObject, typename EdgeStoredObject>
-std::vector<typename DefaultUndirectedGraph<NodeStoredObject, EdgeStoredObject>::NodeType>
-DefaultUndirectedGraph<NodeStoredObject, EdgeStoredObject>::getCutVertices() const
+std::vector<typename DefaultUndirectedGraph<NodeStoredObject,
+    EdgeStoredObject>::NodeType>
+DefaultUndirectedGraph<NodeStoredObject, EdgeStoredObject>::getCutVertices()
+    const
 {
     // Skeleton implementation
     throw std::logic_error("Method not implemented");
 }
 
 template <NodeStoredObj, EdgeStoredObj>
-using Graph = GraphInterface<DefaultUndirectedGraph<NodeStoredObj, EdgeStoredObj>, DefaultNode, NodeStoredObj,
-    DefaultEdge, EdgeStoredObj>;
+using Graph
+    = GraphInterface<DefaultUndirectedGraph<NodeStoredObj, EdgeStoredObj>,
+        DefaultNode, NodeStoredObj, DefaultEdge, EdgeStoredObj>;
 
 } // namespace MathUtils

@@ -61,7 +61,8 @@ public:
     bool operator==(const DefaultEdge& other) const { return id == other.id; }
 };
 
-template <typename NodeStoredObject, typename EdgeStoredObject> class DefaultUndirectedGraph {
+template <typename NodeStoredObject, typename EdgeStoredObject>
+class DefaultUndirectedGraph {
 public:
     using NodeType = NodeInterface<DefaultNode, NodeStoredObject>;
     using EdgeType = EdgeInterface<DefaultEdge, EdgeStoredObject>;
@@ -73,7 +74,8 @@ public:
     DefaultUndirectedGraph& operator=(DefaultUndirectedGraph&&) = delete;
 
     NodeType& addNode(std::shared_ptr<NodeStoredObject> obj);
-    EdgeType& addEdge(const NodeType& node1, const NodeType& node2, std::shared_ptr<EdgeStoredObject> edgeObj);
+    EdgeType& addEdge(const NodeType& node1, const NodeType& node2,
+        std::shared_ptr<EdgeStoredObject> edgeObj);
 
     std::vector<NodeType> getCutVertices() const;
 
@@ -85,14 +87,19 @@ public:
 
 private:
     // Adjacency list with explicit access
-    std::unordered_map<DefaultNode::NodeId, std::unordered_set<DefaultEdge::EdgeId>> adjacencyLists;
-    std::unordered_map<DefaultEdge::EdgeId, std::pair<DefaultNode::NodeId, DefaultNode::NodeId>> neighbours;
+    std::unordered_map<DefaultNode::NodeId,
+        std::unordered_set<DefaultEdge::EdgeId>>
+        adjacencyLists;
+    std::unordered_map<DefaultEdge::EdgeId,
+        std::pair<DefaultNode::NodeId, DefaultNode::NodeId>>
+        neighbours;
 
     std::unordered_map<DefaultNode::NodeId, NodeType> nodes;
     std::unordered_map<DefaultEdge::EdgeId, EdgeType> edges;
 };
 
-static_assert(GraphImplRequirements<DefaultUndirectedGraph<int, int>, DefaultNode, int, DefaultEdge, int>);
+static_assert(GraphImplRequirements<DefaultUndirectedGraph<int, int>,
+    DefaultNode, int, DefaultEdge, int>);
 
 } // namespace MathUtils
 

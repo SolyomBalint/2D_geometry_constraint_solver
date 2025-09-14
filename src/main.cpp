@@ -4,7 +4,7 @@
 #include <format>
 
 // Custom headers
-#include "./constraint_solver/constraint_equation_solver.hpp"
+// #include "./constraint_solver/constraint_equation_solver.hpp"
 
 // Thirdparty headers not needed for rendering
 #include <argparse/argparse.hpp>
@@ -18,11 +18,7 @@
 #include <string>
 #include <vector>
 
-// #include "./utils/graphs/graph_impls/default.hpp"
-#include "./utils/graphs/graph_impls/ogdf_wrapper.hpp"
-
-#include <ogdf/basic/Graph.h>
-#include <ogdf/basic/extended_graph_alg.h>
+#include "./constraint_solver/geometric_constraint_system.hpp"
 
 namespace {
 // NOLINTNEXTLINE note this should be investigated
@@ -59,14 +55,16 @@ void initParserArgumnets(argparse::ArgumentParser& argparser)
               "Allowed values: [TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL]")
         .default_value("INFO");
     argparser.add_argument("--gui")
-        .help("Whether to enable GUI when running the program, defaults to false")
+        .help(
+            "Whether to enable GUI when running the program, defaults to false")
         .default_value(false);
 }
 
 void parseArguments(argparse::ArgumentParser& argparser, std::span<char*> args)
 {
     try {
-        // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions, bugprone-narrowing-conversions)
+        // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions,
+        // bugprone-narrowing-conversions)
         argparser.parse_args(args.size(), args.data());
     } catch (const std::exception& err) {
         std::cerr << err.what() << '\n';
@@ -79,8 +77,9 @@ void parseArguments(argparse::ArgumentParser& argparser, std::span<char*> args)
         auto logLevel = convertLogLevel(inputLogLevel);
 
         if (logLevel == -1) {
-            std::cerr << std::format("Invalid log level input: {}, "
-                                     "Allowed values: [TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL]",
+            std::cerr << std::format(
+                "Invalid log level input: {}, "
+                "Allowed values: [TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL]",
                 inputLogLevel)
                       << '\n';
             // NOLINTNEXTLINE(concurrency-mt-unsafe)
@@ -95,103 +94,73 @@ void parseArguments(argparse::ArgumentParser& argparser, std::span<char*> args)
 
 int main(int argc, char* argv[])
 {
-    argparse::ArgumentParser argparser("2D Geometry Constraint Solver", "0.0.0");
+    argparse::ArgumentParser argparser(
+        "2D Geometry Constraint Solver", "0.0.0");
     initParserArgumnets(argparser);
-    parseArguments(argparser, std::span<char*> { argv, static_cast<size_t>(argc) });
-
-    auto out = Solver::calculatePointToPointDistanceTriangle(8, 8, 8);
-
-    MathUtils::Graph<int, int> testGraph {};
-
-    auto node1 = testGraph.addNode(std::make_shared<int>(1));
-    auto node2 = testGraph.addNode(std::make_shared<int>(2));
-    auto node3 = testGraph.addNode(std::make_shared<int>(3));
-    auto node4 = testGraph.addNode(std::make_shared<int>(4));
-    auto node5 = testGraph.addNode(std::make_shared<int>(5));
-
-    auto edge1 = testGraph.addEdge(node1, node2, std::make_shared<int>(1));
-    auto edge2 = testGraph.addEdge(node1, node3, std::make_shared<int>(1));
-
-    auto edge3 = testGraph.addEdge(node3, node2, std::make_shared<int>(1));
-
-    auto edge4 = testGraph.addEdge(node3, node4, std::make_shared<int>(1));
-    auto edge5 = testGraph.addEdge(node3, node5, std::make_shared<int>(1));
-    auto edge6 = testGraph.addEdge(node4, node5, std::make_shared<int>(1));
-
-    auto outNodes = testGraph.getCutVertices();
-
-    std::cout << outNodes.size() << std::endl;
-    std::cout << *(outNodes[0].getStoredObj().get()) << std::endl;
-
-    MathUtils::Graph<int, int> testGraphSeparationPairs {};
-    auto node21 = testGraphSeparationPairs.addNode(std::make_shared<int>(1));
-    auto node22 = testGraphSeparationPairs.addNode(std::make_shared<int>(2));
-    auto node23 = testGraphSeparationPairs.addNode(std::make_shared<int>(3));
-    auto node24 = testGraphSeparationPairs.addNode(std::make_shared<int>(4));
-
-    auto edge21 = testGraphSeparationPairs.addEdge(node21, node22, std::make_shared<int>(8));
-    auto edge22 = testGraphSeparationPairs.addEdge(node21, node23, std::make_shared<int>(9));
-    auto edge23 = testGraphSeparationPairs.addEdge(node22, node23, std::make_shared<int>(10));
-    auto edge24 = testGraphSeparationPairs.addEdge(node22, node24, std::make_shared<int>(11));
-    auto edge25 = testGraphSeparationPairs.addEdge(node23, node24, std::make_shared<int>(12));
-
-    MathUtils::Graph<int, int>::NodeType outNode1; // Actual objects, not pointers
-    MathUtils::Graph<int, int>::NodeType outNode2;
-
-    testGraphSeparationPairs.getSeparationPairs(&outNode1, &outNode2); // Pass addresses
-
-    testGraphSeparationPairs.separateByVerticesByDuplication({ outNode1, outNode2 });
-
-    ogdf::Graph test {};
-
-    auto nodex = test.newNode(5);
-    auto nodey = test.newNode(6);
-    auto nodez = test.newNode(7);
-    test.newEdge(nodex, nodey);
-
-    ogdf::List<ogdf::node> testList {};
-    testList.pushBack(nodex);
-    testList.pushBack(nodey);
-    testList.search(nodex);
-
-    ogdf::Graph subGraph {};
-    ogdf::ListIterator<ogdf::node> it { testList.begin() };
-    ogdf::inducedSubGraph(test, it, subGraph);
-
-    // std::cout << test.edges.size() << std::endl;
-    std::cout << test.nodes.head()->index() << std::endl;
-
-    // std::cout << subGraph.edges.size() << std::endl;
-    std::cout << subGraph.nodes.head()->index() << std::endl;
-
-    //
-    // ogdf::Graph test2 {};
-    // test2.newNode(test.nodes.tail()->index());
-    //
-    // test2.delNode(test.nodes.tail());
-    //
-    // std::cout << test.nodes.tail()->index() << "\n";
-    // std::cout << test2.nodes.tail()->index() << "\n";
-
-    // this fails
-    // test.delNode(test2.nodes.tail());
-
-    // ogdf::List<ogdf::node> nodeTest {};
-    // test.allNodes(nodeTest);
-    //
-    // std::cout << "\n";
-    //
-    // std::cout << nodeTest.size() << "\n";
-    // std::cout << test.nodes.size() << "\n";
-    //
-    // std::cout << "\n";
-    //
-    // nodeTest.clear();
-    //
-    // std::cout << nodeTest.size() << "\n";
-    // std::cout << test.nodes.size() << "\n";
+    parseArguments(
+        argparser, std::span<char*> { argv, static_cast<size_t>(argc) });
 
     auto gui = argparser.get<bool>("--gui");
+
+    MathUtils::Graph<Gcs::Element, Gcs::Constraint> constraintGraph;
+    auto node1 = constraintGraph.addNode(
+        std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 0.0 }));
+    auto node2 = constraintGraph.addNode(
+        std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 5.0 }));
+    auto node3 = constraintGraph.addNode(
+        std::make_shared<Gcs::Element>(Gcs::Point { 5.0, 0.0 }));
+    auto node4 = constraintGraph.addNode(
+        std::make_shared<Gcs::Element>(Gcs::Point { 5.0, 5.0 }));
+
+    auto edge1 = constraintGraph.addEdge(node1, node2,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    auto edge2 = constraintGraph.addEdge(node1, node3,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    auto edge3 = constraintGraph.addEdge(node2, node4,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    auto edge4 = constraintGraph.addEdge(node3, node4,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    auto edge5 = constraintGraph.addEdge(node2, node3,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+
+    auto [sep1, sep2] = constraintGraph.getSeparationPairs();
+    auto vec = constraintGraph.separateByVerticesByDuplication(
+        { sep1.value(), sep2.value() });
+
+    MathUtils::Graph<Gcs::Element, Gcs::Constraint> checkProblems { std::move(
+        vec[0]) };
+    checkProblems.getSeparationPairs();
+
+    MathUtils::Graph<Gcs::Element, Gcs::Constraint> checkProblems2 { std::move(
+        vec[1]) };
+    checkProblems2.getSeparationPairs();
+
+    std::cout << "===========================" << std::endl;
+
+    // Create a fresh constraint graph for testing defaultDecompositorFunc
+    MathUtils::Graph<Gcs::Element, Gcs::Constraint> testGraph;
+    auto testNode1 = testGraph.addNode(
+        std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 0.0 }));
+    auto testNode2 = testGraph.addNode(
+        std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 5.0 }));
+    auto testNode3 = testGraph.addNode(
+        std::make_shared<Gcs::Element>(Gcs::Point { 5.0, 0.0 }));
+    auto testNode4 = testGraph.addNode(
+        std::make_shared<Gcs::Element>(Gcs::Point { 5.0, 5.0 }));
+
+    auto testEdge1 = testGraph.addEdge(testNode1, testNode2,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    auto testEdge2 = testGraph.addEdge(testNode1, testNode3,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    auto testEdge3 = testGraph.addEdge(testNode2, testNode4,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    auto testEdge4 = testGraph.addEdge(testNode3, testNode4,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    auto testEdge5 = testGraph.addEdge(testNode2, testNode3,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+
+    auto subGraphs = Gcs::defaultDecompositorFunc(testGraph);
+    std::cout << subGraphs.size() << std::endl;
 
     if (gui) { }
 

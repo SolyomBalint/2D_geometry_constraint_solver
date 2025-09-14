@@ -82,6 +82,7 @@ endif()
 
 add_executable(${PROJECT_NAME}  src/main.cpp
                                 src/constraint_solver/constraint_equation_solver.cpp
+                                src/constraint_solver/geometric_constraint_system.cpp
                                 src/common/common/common_uuid.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ./include
@@ -105,4 +106,4 @@ target_link_libraries(${PROJECT_NAME} PRIVATE   stduuid::stduuid argparse::argpa
 # coming from Scott Meyers series
 # TODO: make sure that the flags are correct for different compilers such as gcc and clang
 target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:-ggdb>
--pedantic-errors -Wall -Weffc++ -Wextra -Wconversion -Wsign-conversion)
+-pedantic-errors -Wall -Wextra -Wconversion -Wsign-conversion)

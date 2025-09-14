@@ -15,10 +15,14 @@ NB_MODULE(equation_system_solver_binding, m)
         .def_rw("x", &Solver::Coordinates2D::x)
         .def_rw("y", &Solver::Coordinates2D::y)
         .def("__repr__", [](const Solver::Coordinates2D& c) -> std::string {
-            return "Coordinates2D(x=" + std::to_string(c.x) + ", y=" + std::to_string(c.y) + ")";
+            return "Coordinates2D(x=" + std::to_string(c.x)
+                + ", y=" + std::to_string(c.y) + ")";
         });
 
-    m.def("calculatePointToPointDistanceTriangle", &Solver::calculatePointToPointDistanceTriangle,
-        "Calculates the coordinates of edges of a triangle using Newton-Raphson method", nb::arg("xToYDistance"),
-        nb::arg("xToZDistance"), nb::arg("yToZDistance"));
+    m.def("calculatePointToPointDistanceTriangle",
+        &Solver::calculatePointToPointDistanceTriangle,
+        "Calculates the coordinates of edges of a triangle using "
+        "Newton-Raphson method",
+        nb::arg("xToYDistance"), nb::arg("xToZDistance"),
+        nb::arg("yToZDistance"));
 }
