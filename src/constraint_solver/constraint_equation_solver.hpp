@@ -21,9 +21,26 @@ struct Coordinates2D {
  * @param xToZDistance The distance between points x and z
  * @param yToZDistance The distance between points y and z
  */
-std::vector<Coordinates2D> calculatePointToPointDistanceTriangle(
-    const double xToYDistance, const double xToZDistance,
-    const double yToZDistance);
+std::tuple<Coordinates2D, Coordinates2D, Coordinates2D>
+calculatePointToPointDistanceTriangle(const double xToYDistance,
+    const double xToZDistance, const double yToZDistance);
+
+/**
+ * @brief Calculate the values of a third point based on two constant points and
+ * distance constraints using the Newton-Raphson method in the form of
+ * J_f(x_k)s_k = -f(x_k)
+ *
+ * @param p1 coordinates of the first constant point
+ * @param p2 coordinates of the first constant point
+ * @param distanceP2P3 distance constraint between the p2 and the third point we
+ * want to calculate (d2)
+ * @param distanceP1P3 distance constraint between the p1 and the third point we
+ * want to calculate (d3)
+ */
+Coordinates2D calculatePointToPointDistanceTriangleFromTwoFixedPoints(
+    const Coordinates2D& p1, const Coordinates2D& p2, const double distanceP2P3,
+    const double distanceP1P3);
+
 }; // namespace Solver
 
 #endif // CONSTRAINT_EQUATION_SOLVER_HPP

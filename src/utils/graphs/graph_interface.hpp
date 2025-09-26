@@ -80,6 +80,10 @@ public:
     auto getImpl() const { return impl_; }
 
     std::shared_ptr<StoredObjectType> getStoredObj() { return storedObject; }
+    std::shared_ptr<StoredObjectType> getStoredObj() const
+    {
+        return storedObject;
+    }
 };
 
 /**
@@ -155,8 +159,9 @@ concept GraphImplRequirements = requires(GraphType graph_t,
     requires std::same_as<typename GraphType::EdgeType,
         EdgeInterface<EdgeType, EdgeStoredObject>>;
 
-    requires std::move_constructible<GraphType>;
-    requires std::movable<GraphType>;
+    requires std::copy_constructible<GraphType>
+        || std::move_constructible<GraphType>;
+    requires std::copyable<GraphType> || std::movable<GraphType>;
 
     {
         graph_t.addNode(std::declval<std::shared_ptr<NodeStoredObject>>())
@@ -181,6 +186,22 @@ concept GraphImplRequirements = requires(GraphType graph_t,
 
     { graph_t.getNodeCount() } -> std::convertible_to<std::size_t>;
     { graph_t.getEdgeCount() } -> std::convertible_to<std::size_t>;
+
+    { graph_t.getNodes() } -> std::ranges::range;
+    { graph_t.getEdges() } -> std::ranges::range;
+
+    {
+        graph_t.getEdgeBetweenNodes(
+            std::declval<const typename GraphType::NodeType&>(),
+            std::declval<const typename GraphType::NodeType&>())
+    } -> std::same_as<std::optional<typename GraphType::EdgeType>>;
+
+    requires std::same_as<
+        std::ranges::range_value_t<decltype(graph_t.getNodes())>,
+        typename GraphType::NodeType>;
+    requires std::same_as<
+        std::ranges::range_value_t<decltype(graph_t.getEdges())>,
+        typename GraphType::EdgeType>;
 };
 
 template <typename GraphImpl, typename NodeImpl, typename NodeStoredObject,
@@ -205,8 +226,21 @@ public:
     {
     }
 
-    GraphInterface(const GraphInterface&) = delete;
-    GraphInterface& operator=(const GraphInterface&) = delete;
+    GraphInterface(const GraphInterface& other)
+        : impl_(other.impl_)
+        , id_(Common::generateUuidMt19937())
+    {
+    }
+
+    GraphInterface& operator=(const GraphInterface& other)
+    {
+        if (this != &other) {
+            impl_ = other.impl_;
+            id_ = Common::generateUuidMt19937();
+        }
+        return *this;
+    }
+
     GraphInterface(GraphInterface&&) noexcept = default;
     GraphInterface& operator=(GraphInterface&&) noexcept = default;
 
@@ -247,6 +281,16 @@ public:
     std::size_t getNodeCount() const { return impl_.getNodeCount(); }
 
     std::size_t getEdgeCount() const { return impl_.getEdgeCount(); }
+
+    auto getNodes() const { return impl_.getNodes(); }
+
+    auto getEdges() const { return impl_.getEdges(); }
+
+    std::optional<EdgeType> getEdgeBetweenNodes(
+        const NodeType& node1, const NodeType& node2) const
+    {
+        return impl_.getEdgeBetweenNodes(node1, node2);
+    }
 
     Common::Uuid getId() const { return id_; }
 

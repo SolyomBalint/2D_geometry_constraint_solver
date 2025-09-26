@@ -1,11 +1,142 @@
+/**
+ * @file
+ * @brief
+ * TODOS:  Currently there is no check for virtual edges anywhere, and the 3.
+ * condition of the algebraic approahc isnot checked
+ */
+
 #include "geometric_constraint_system.hpp"
+#include "constraint_equation_solver.hpp"
 #include <stdexcept>
 #include <queue>
 
 namespace Gcs {
 
-bool defaultDetectorFunc(
-    const MathUtils::Graph<Element, Constraint>& constraintGraph)
+// TODO This whole nameless namespace should be refactored, most of to function
+// are hard coded instead of real logic
+namespace {
+
+    constexpr int point1Index = 0;
+    constexpr int point2Index = 1;
+    constexpr int point3Index = 2;
+
+    int getNumberOfCalculatedNode(const ConstraintGraph& subGraph)
+    {
+        auto nodes = subGraph.getNodes();
+
+        int calculated = 0;
+        for (const auto& node : nodes) {
+            if (node.getStoredObj().get()->isElementSet()) {
+                ++calculated;
+            }
+        }
+
+        return calculated;
+    }
+
+    void solveFromZeroCalculatedNodes(ConstraintGraph& subGraph)
+    {
+        auto nodes = subGraph.getNodes();
+
+        // DEBUG
+        getGcsLogger()->debug("From the zero known points functions: Elements");
+        for (const auto& node : nodes) {
+            getGcsLogger()->debug(node.getStoredObj()->toString());
+        }
+        getGcsLogger()->debug(
+            "From the zero known points functions: Constraints");
+        for (const auto& edge : subGraph.getEdges()) {
+            getGcsLogger()->debug(edge.getStoredObj()->getConstraintValue());
+        }
+        // DEBUG
+
+        auto p1 = nodes.at(point1Index);
+        auto p2 = nodes.at(point2Index);
+        auto p3 = nodes.at(point3Index);
+
+        const auto xToYDistance = subGraph.getEdgeBetweenNodes(p1, p2)
+                                      .value()
+                                      .getStoredObj()
+                                      ->getConstraintValue();
+        const auto xToZDistance = subGraph.getEdgeBetweenNodes(p1, p3)
+                                      .value()
+                                      .getStoredObj()
+                                      ->getConstraintValue();
+        const auto yToZDistance = subGraph.getEdgeBetweenNodes(p2, p3)
+                                      .value()
+                                      .getStoredObj()
+                                      ->getConstraintValue();
+
+        const auto [p1Coords, p2Coords, p3Coords]
+            = Solver::calculatePointToPointDistanceTriangle(
+                xToYDistance, xToZDistance, yToZDistance);
+
+        p1.getStoredObj()->updateElementPosition(p1Coords.x, p1Coords.y);
+        p2.getStoredObj()->updateElementPosition(p2Coords.x, p2Coords.y);
+        p3.getStoredObj()->updateElementPosition(p3Coords.x, p3Coords.y);
+    }
+
+    void solveFromTwoCalculatedNodes(ConstraintGraph& subGraph)
+    {
+
+        using Node = ConstraintGraph::NodeType;
+        auto nodes = subGraph.getNodes();
+
+        std::vector<Node> setElemnts;
+
+        Node notSetElement;
+
+        for (const auto& node : nodes) {
+            if (node.getStoredObj()->isElementSet()) {
+                setElemnts.push_back(node);
+            } else {
+                notSetElement = node;
+            }
+        }
+        if (setElemnts.size() > 2) {
+            throw std::runtime_error(
+                "Trying to solve triangle with more than two solved elements");
+        }
+        // debug
+        getGcsLogger()->debug(
+            "From the two known points functions: Set Elements");
+        for (const auto& node : setElemnts) {
+            getGcsLogger()->debug(node.getStoredObj()->toString());
+        }
+
+        getGcsLogger()->debug(
+            "From the two known points functions: not Element");
+        getGcsLogger()->debug(notSetElement.getStoredObj()->toString());
+
+        getGcsLogger()->debug(
+            "From the two known points functions: Constraints");
+        for (const auto& edge : subGraph.getEdges()) {
+            getGcsLogger()->debug(edge.getStoredObj()->getConstraintValue());
+        }
+        // debug
+
+        auto p1ToP3Distance
+            = subGraph.getEdgeBetweenNodes(setElemnts.front(), notSetElement)
+                  ->getStoredObj()
+                  ->getConstraintValue();
+        auto p2ToP3Distance
+            = subGraph.getEdgeBetweenNodes(setElemnts.back(), notSetElement)
+                  ->getStoredObj()
+                  ->getConstraintValue();
+
+        Point p1 { setElemnts.front().getStoredObj()->getElement<Point>() };
+        Point p2 { setElemnts.back().getStoredObj()->getElement<Point>() };
+
+        auto outPutCoords
+            = Solver::calculatePointToPointDistanceTriangleFromTwoFixedPoints(
+                { p1.x, p1.y }, { p2.x, p2.y }, p2ToP3Distance, p1ToP3Distance);
+
+        notSetElement.getStoredObj()->updateElementPosition(
+            outPutCoords.x, outPutCoords.y);
+    }
+}
+
+bool defaultDetectorFunc(const ConstraintGraph& constraintGraph)
 {
     // Based on Lamans theorem, only works for constraint graph with distance
     // constraints and point elements
@@ -13,13 +144,13 @@ bool defaultDetectorFunc(
         == 2 * constraintGraph.getNodeCount() - 3;
 }
 
-void defaultResolverFunc(MathUtils::Graph<Element, Constraint>& constraintGraph)
+void defaultResolverFunc(ConstraintGraph& constraintGraph)
 {
     throw std::runtime_error("defaultResolverFunc not implemented");
 }
 
-std::vector<MathUtils::Graph<Element, Constraint>> defaultDecompositorFunc(
-    MathUtils::Graph<Element, Constraint>& constraintGraph)
+std::vector<ConstraintGraph> defaultDecompositorFunc(
+    ConstraintGraph& constraintGraph)
 {
     // Checking if graph is biconnected, solving it is currently out of scope
     if (!constraintGraph.getCutVertices().empty()) {
@@ -28,11 +159,11 @@ std::vector<MathUtils::Graph<Element, Constraint>> defaultDecompositorFunc(
             "biconnected graphs");
     }
 
-    std::vector<MathUtils::Graph<Element, Constraint>> result {};
+    std::vector<ConstraintGraph> result {};
 
     // Use iterative decomposition without moving the original graph
-    auto decompose = [&](MathUtils::Graph<Element, Constraint>& graph)
-        -> std::vector<MathUtils::Graph<Element, Constraint>> {
+    auto decompose
+        = [&](ConstraintGraph& graph) -> std::vector<ConstraintGraph> {
         auto separationPair = graph.getSeparationPairs();
 
         if (separationPair.first.has_value()
@@ -52,15 +183,15 @@ std::vector<MathUtils::Graph<Element, Constraint>> defaultDecompositorFunc(
     auto initialSubGraphs = decompose(constraintGraph);
 
     if (initialSubGraphs.empty()) {
-        // No separation pairs found, return the original graph
-        result.emplace_back(std::move(constraintGraph));
+        // No separation pairs found, return copy of the original graph
+        result.emplace_back(constraintGraph);
         return result;
     }
 
     // Queue to process subgraphs
-    std::queue<MathUtils::Graph<Element, Constraint>> graphQueue;
-    for (auto& subGraph : initialSubGraphs) {
-        graphQueue.push(std::move(subGraph));
+    std::queue<ConstraintGraph> graphQueue;
+    for (const auto& subGraph : initialSubGraphs) {
+        graphQueue.push(subGraph);
     }
 
     int count = 0;
@@ -68,7 +199,7 @@ std::vector<MathUtils::Graph<Element, Constraint>> defaultDecompositorFunc(
         getGcsLogger()->debug("Size of result: {}", result.size());
         getGcsLogger()->debug("Current decomposition iteration: {}", count++);
 
-        auto currentGraph = std::move(graphQueue.front());
+        auto currentGraph = graphQueue.front();
         graphQueue.pop();
 
         auto subGraphs = decompose(currentGraph);
@@ -76,13 +207,13 @@ std::vector<MathUtils::Graph<Element, Constraint>> defaultDecompositorFunc(
         if (subGraphs.empty()) {
             // No more separation pairs, add to result
             getGcsLogger()->debug("Adding triconnected component to result");
-            result.emplace_back(std::move(currentGraph));
+            result.emplace_back(currentGraph);
         } else {
             // Add new subgraphs to queue for further processing
-            for (auto& subGraph : subGraphs) {
+            for (const auto& subGraph : subGraphs) {
                 getGcsLogger()->debug(
                     "Adding subgraph to queue for further decomposition");
-                graphQueue.push(std::move(subGraph));
+                graphQueue.push(subGraph);
             }
         }
     }
@@ -90,10 +221,48 @@ std::vector<MathUtils::Graph<Element, Constraint>> defaultDecompositorFunc(
     return result;
 }
 
-void defaultSolverFunc(
-    std::vector<MathUtils::Graph<Element, Constraint>>& subgraphs)
+void defaultSolverFunc(std::vector<ConstraintGraph>& subgraphs)
 {
-    throw std::runtime_error("defaultSolverFunc not implemented");
+    for (auto& graph : subgraphs) {
+        if (graph.getNodeCount() != 3 || graph.getEdgeCount() != 3) {
+            throw std::runtime_error(
+                "Solver does not support non triangle subgraphs");
+        }
+    }
+
+    auto starterGraph = subgraphs.front();
+    solveFromZeroCalculatedNodes(starterGraph);
+
+    // NOTE: this is ugly, a better solutions should be used once there is time
+    while (true) {
+        auto solvableGraphs
+            = subgraphs | std::views::filter([](const ConstraintGraph& graph) {
+                  return getNumberOfCalculatedNode(graph) == 2;
+              });
+
+        // There are no more solvable graphs
+        if (solvableGraphs.empty()) {
+            break;
+        }
+
+        for (auto& graph : solvableGraphs) {
+            solveFromTwoCalculatedNodes(graph);
+        }
+    }
+}
+
+void GeometricConstraintSystem::solveGcsViaPipeline(
+    ConstraintGraph& constraintGraph)
+{
+    while (!constraintnessDetector(constraintGraph)) {
+        constraintnessResolver(constraintGraph);
+    }
+
+    auto subraphs = graphDecompositor(constraintGraph);
+
+    getGcsLogger()->debug("Number of subgraphs {}", subraphs.size());
+
+    subgraphSolver(subraphs);
 }
 
 } // namespace Gcs

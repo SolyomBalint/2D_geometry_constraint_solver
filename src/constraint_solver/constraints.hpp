@@ -13,8 +13,8 @@ concept ConstraintType = requires(T constraint) {
 };
 
 struct DistanceConstraint {
-    float distance;
-    explicit DistanceConstraint(float d)
+    double distance;
+    explicit DistanceConstraint(double d)
         : distance { d }
     {
     }
@@ -22,8 +22,8 @@ struct DistanceConstraint {
     double getConstraintValue() const { return distance; }
 };
 struct TangencyConstraint {
-    float angle;
-    explicit TangencyConstraint(float d)
+    double angle;
+    explicit TangencyConstraint(double d)
         : angle { d }
     {
     }

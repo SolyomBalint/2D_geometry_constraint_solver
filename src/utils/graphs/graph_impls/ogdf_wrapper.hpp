@@ -30,7 +30,7 @@ inline std::shared_ptr<spdlog::logger> getOGDFGraphLogger()
 
 class OGDFNodeImpl {
 private:
-    ogdf::node node_;
+    ogdf::node node_ = nullptr;
     ogdf::node optPairNode = nullptr;
 
 public:
@@ -40,7 +40,7 @@ public:
     {
     }
 
-    int getId() const { return node_->index(); }
+    int getId() const { return node_ ? node_->index() : -1; }
     ogdf::node getNode() const { return node_; }
     ogdf::node getPairNode() const { return optPairNode; }
     void setPairNode(ogdf::node pair) { optPairNode = pair; }
@@ -48,17 +48,18 @@ public:
 
 class OGDFEdgeImpl {
 private:
-    ogdf::edge edge_;
-    bool virtualEdge;
+    ogdf::edge edge_ = nullptr;
+    bool virtualEdge = false;
 
 public:
+    OGDFEdgeImpl() = default;
     OGDFEdgeImpl(ogdf::edge edge, bool isVirtualEdge = false)
         : edge_ { edge }
         , virtualEdge { isVirtualEdge }
     {
     }
 
-    int getId() const { return edge_->index(); }
+    int getId() const { return edge_ ? edge_->index() : -1; }
 
     ogdf::edge getEdge() const { return edge_; }
 
@@ -72,8 +73,32 @@ public:
     using EdgeType = EdgeInterface<OGDFEdgeImpl, EdgeStoredObject>;
 
     OGDFGraphImpl() = default;
-    OGDFGraphImpl(const OGDFGraphImpl&) = delete;
-    OGDFGraphImpl& operator=(const OGDFGraphImpl&) = delete;
+
+    OGDFGraphImpl(const OGDFGraphImpl& other)
+        : nodeMap_(other.nodeMap_)
+        , edgeMap_(other.edgeMap_)
+    {
+        auto [nodeMapping, edgeMapping] = copyOGDFGraph(other.graph_, graph_);
+        updateNodeAndEdgeReferences(nodeMapping, edgeMapping, other.graph_);
+    }
+
+    OGDFGraphImpl& operator=(const OGDFGraphImpl& other)
+    {
+        if (this != &other) {
+            graph_.clear();
+            nodeMap_.clear();
+            edgeMap_.clear();
+
+            nodeMap_ = other.nodeMap_;
+            edgeMap_ = other.edgeMap_;
+
+            auto [nodeMapping, edgeMapping]
+                = copyOGDFGraph(other.graph_, graph_);
+            updateNodeAndEdgeReferences(nodeMapping, edgeMapping, other.graph_);
+        }
+        return *this;
+    }
+
     OGDFGraphImpl(OGDFGraphImpl&&) noexcept = default;
     OGDFGraphImpl& operator=(OGDFGraphImpl&&) noexcept = default;
 
@@ -81,6 +106,67 @@ private:
     ogdf::Graph graph_;
     std::unordered_map<int, NodeType> nodeMap_;
     std::unordered_map<int, EdgeType> edgeMap_;
+
+    std::pair<ogdf::NodeArray<ogdf::node>, ogdf::EdgeArray<ogdf::edge>>
+    copyOGDFGraph(const ogdf::Graph& source, ogdf::Graph& target)
+    {
+        target.clear();
+        ogdf::NodeArray<ogdf::node> nodeMapping(source);
+        ogdf::EdgeArray<ogdf::edge> edgeMapping(source);
+
+        for (ogdf::node sourceNode : source.nodes) {
+            ogdf::node targetNode = target.newNode();
+            nodeMapping[sourceNode] = targetNode;
+        }
+
+        for (ogdf::edge sourceEdge : source.edges) {
+            ogdf::node sourceFrom = sourceEdge->source();
+            ogdf::node sourceTo = sourceEdge->target();
+            ogdf::node targetFrom = nodeMapping[sourceFrom];
+            ogdf::node targetTo = nodeMapping[sourceTo];
+            ogdf::edge targetEdge = target.newEdge(targetFrom, targetTo);
+            edgeMapping[sourceEdge] = targetEdge;
+        }
+
+        return { nodeMapping, edgeMapping };
+    }
+
+    void updateNodeAndEdgeReferences(
+        const ogdf::NodeArray<ogdf::node>& nodeMapping,
+        const ogdf::EdgeArray<ogdf::edge>& edgeMapping,
+        const ogdf::Graph& sourceGraph)
+    {
+        std::unordered_map<int, NodeType> newNodeMap;
+        std::unordered_map<int, EdgeType> newEdgeMap;
+
+        for (ogdf::node sourceNode : sourceGraph.nodes) {
+            ogdf::node targetNode = nodeMapping[sourceNode];
+            int sourceIndex = sourceNode->index();
+
+            auto oldNodeIt = nodeMap_.find(sourceIndex);
+            if (oldNodeIt != nodeMap_.end()) {
+                NodeType updatedNode(OGDFNodeImpl { targetNode },
+                    oldNodeIt->second.getStoredObj());
+                newNodeMap[targetNode->index()] = std::move(updatedNode);
+            }
+        }
+
+        for (ogdf::edge sourceEdge : sourceGraph.edges) {
+            ogdf::edge targetEdge = edgeMapping[sourceEdge];
+            int sourceIndex = sourceEdge->index();
+
+            auto oldEdgeIt = edgeMap_.find(sourceIndex);
+            if (oldEdgeIt != edgeMap_.end()) {
+                bool wasVirtual = oldEdgeIt->second.getImpl().isVirtual();
+                EdgeType updatedEdge(OGDFEdgeImpl { targetEdge, wasVirtual },
+                    oldEdgeIt->second.getStoredObj());
+                newEdgeMap[targetEdge->index()] = std::move(updatedEdge);
+            }
+        }
+
+        nodeMap_ = std::move(newNodeMap);
+        edgeMap_ = std::move(newEdgeMap);
+    }
 
     OGDFGraphImpl createMappedSubGraph(
         const std::vector<ogdf::node>& currentlyVisitedNodes,
@@ -222,6 +308,7 @@ public:
         // Debug: Check if keys exist in map
         int index1 = separatorNodeOne->index();
         int index2 = separatorNodeTwo->index();
+        getOGDFGraphLogger()->debug("Separation Pairs {}, {}", index1, index2);
 
         auto it1 = nodeMap_.find(index1);
         auto it2 = nodeMap_.find(index2);
@@ -313,6 +400,51 @@ public:
     std::size_t getNodeCount() const { return graph_.numberOfNodes(); }
 
     std::size_t getEdgeCount() const { return graph_.numberOfEdges(); }
+
+    std::vector<NodeType> getNodes() const
+    {
+        std::vector<NodeType> nodes;
+        nodes.reserve(nodeMap_.size());
+        for (const auto& [index, node] : nodeMap_) {
+            nodes.push_back(node);
+        }
+        return nodes;
+    }
+
+    std::vector<EdgeType> getEdges() const
+    {
+        std::vector<EdgeType> edges;
+        edges.reserve(edgeMap_.size());
+        for (const auto& [index, edge] : edgeMap_) {
+            edges.push_back(edge);
+        }
+        return edges;
+    }
+
+    std::optional<EdgeType> getEdgeBetweenNodes(
+        const NodeType& node1, const NodeType& node2) const
+    {
+        auto it1 = nodeMap_.find(node1.getId());
+        auto it2 = nodeMap_.find(node2.getId());
+
+        if (it1 == nodeMap_.end() || it2 == nodeMap_.end()) {
+            return std::nullopt;
+        }
+
+        ogdf::node ogdfNode1 = it1->second.getImpl().getNode();
+        ogdf::node ogdfNode2 = it2->second.getImpl().getNode();
+
+        // Search through all edges to find one connecting these two nodes
+        for (const auto& [edgeIndex, edgeWrapper] : edgeMap_) {
+            ogdf::edge ogdfEdge = edgeWrapper.getImpl().getEdge();
+
+            if (isEdgeBetweenNodes(ogdfEdge, ogdfNode1, ogdfNode2)) {
+                return edgeWrapper;
+            }
+        }
+
+        return std::nullopt;
+    }
 };
 
 static_assert(GraphImplRequirements<OGDFGraphImpl<int, int>, OGDFNodeImpl, int,

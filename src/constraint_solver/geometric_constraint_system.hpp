@@ -8,36 +8,34 @@
 
 namespace Gcs {
 
+using ConstraintGraph = MathUtils::Graph<Element, Constraint>;
+
 inline std::shared_ptr<spdlog::logger> getGcsLogger()
 {
     static auto gcsLogger = spdlog::stdout_color_mt("GCS_LOGGER");
     return gcsLogger;
 }
 
-using DetectorFunc = bool (*)(const MathUtils::Graph<Element, Constraint>&);
-using ResolverFunc = void (*)(MathUtils::Graph<Element, Constraint>&);
-using DecompositorFunc = std::vector<MathUtils::Graph<Element, Constraint>> (*)(
-    MathUtils::Graph<Element, Constraint>&);
-using SolverFunc
-    = void (*)(std::vector<MathUtils::Graph<Element, Constraint>>&);
+using DetectorFunc = bool (*)(const ConstraintGraph&);
+using ResolverFunc = void (*)(ConstraintGraph&);
+using DecompositorFunc = std::vector<ConstraintGraph> (*)(ConstraintGraph&);
+using SolverFunc = void (*)(std::vector<ConstraintGraph>&);
 
 /**
  * @brief Uses Lamans theorem for detecting under- or over-constrained graphs
  * @param The constraint graph that should be checked
  * @return bool: true if the graph is well-constrained, false otherwise
  */
-bool defaultDetectorFunc(const MathUtils::Graph<Element, Constraint>&);
+bool defaultDetectorFunc(const ConstraintGraph&);
 
-void defaultResolverFunc(MathUtils::Graph<Element, Constraint>&);
+void defaultResolverFunc(ConstraintGraph&);
 
-std::vector<MathUtils::Graph<Element, Constraint>> defaultDecompositorFunc(
-    MathUtils::Graph<Element, Constraint>&);
+std::vector<ConstraintGraph> defaultDecompositorFunc(ConstraintGraph&);
 
-void defaultSolverFunc(std::vector<MathUtils::Graph<Element, Constraint>>&);
+void defaultSolverFunc(std::vector<ConstraintGraph>&);
 
-class GeometricConstraintSystem {
+class GeometricConstraintSystem final {
 private:
-    MathUtils::Graph<Element, Constraint> constraintGraph {};
     DetectorFunc constraintnessDetector = defaultDetectorFunc;
     ResolverFunc constraintnessResolver = defaultResolverFunc;
     DecompositorFunc graphDecompositor = defaultDecompositorFunc;
@@ -45,35 +43,16 @@ private:
 
 public:
     GeometricConstraintSystem() = default;
-    GeometricConstraintSystem(
-        MathUtils::Graph<Element, Constraint>&& constraintGraph)
-        : constraintGraph { std::move(constraintGraph) }
-    {
-    }
-
-    std::vector<MathUtils::Graph<Element, Constraint>> testIngThisShit()
-    {
-        auto [sep1, sep2] = constraintGraph.getSeparationPairs();
-        auto vec = constraintGraph.separateByVerticesByDuplication(
-            { sep1.value(), sep2.value() });
-
-        std::cout << vec.size() << std::endl;
-        std::cout << vec[0].getNodeCount() << std::endl;
-        std::cout << vec[1].getNodeCount() << std::endl;
-        std::cout << vec[0].getEdgeCount() << std::endl;
-        std::cout << vec[1].getEdgeCount() << std::endl;
-        std::cout << constraintGraph.getNodeCount() << std::endl;
-        std::cout << constraintGraph.getEdgeCount() << std::endl;
-
-        // return graphDecompositor(constraintGraph);
-        return vec;
-    }
 
     GeometricConstraintSystem(const GeometricConstraintSystem&) = delete;
     GeometricConstraintSystem& operator=(const GeometricConstraintSystem&)
         = delete;
     GeometricConstraintSystem(GeometricConstraintSystem&&) = delete;
     GeometricConstraintSystem& operator=(GeometricConstraintSystem&&) = delete;
+
+    // NOTE: this is a temporary solution due to the botched move semantics of
+    // OGDF
+    void solveGcsViaPipeline(ConstraintGraph&);
 
     /**
      * @brief Sets the function used to detect whether the input graph is

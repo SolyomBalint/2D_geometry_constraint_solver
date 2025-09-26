@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "./constraint_solver/geometric_constraint_system.hpp"
+#include "./constraint_solver/constraint_equation_solver.hpp"
 
 namespace {
 // NOLINTNEXTLINE note this should be investigated
@@ -102,65 +103,126 @@ int main(int argc, char* argv[])
 
     auto gui = argparser.get<bool>("--gui");
 
-    MathUtils::Graph<Gcs::Element, Gcs::Constraint> constraintGraph;
-    auto node1 = constraintGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 0.0 }));
-    auto node2 = constraintGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 5.0 }));
-    auto node3 = constraintGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 5.0, 0.0 }));
-    auto node4 = constraintGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 5.0, 5.0 }));
-
-    auto edge1 = constraintGraph.addEdge(node1, node2,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
-    auto edge2 = constraintGraph.addEdge(node1, node3,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
-    auto edge3 = constraintGraph.addEdge(node2, node4,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
-    auto edge4 = constraintGraph.addEdge(node3, node4,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
-    auto edge5 = constraintGraph.addEdge(node2, node3,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
-
-    auto [sep1, sep2] = constraintGraph.getSeparationPairs();
-    auto vec = constraintGraph.separateByVerticesByDuplication(
-        { sep1.value(), sep2.value() });
-
-    MathUtils::Graph<Gcs::Element, Gcs::Constraint> checkProblems { std::move(
-        vec[0]) };
-    checkProblems.getSeparationPairs();
-
-    MathUtils::Graph<Gcs::Element, Gcs::Constraint> checkProblems2 { std::move(
-        vec[1]) };
-    checkProblems2.getSeparationPairs();
+    // MathUtils::Graph<Gcs::Element, Gcs::Constraint> constraintGraph;
+    // auto node1 = constraintGraph.addNode(
+    //     std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 0.0 }));
+    // auto node2 = constraintGraph.addNode(
+    //     std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 5.0 }));
+    // auto node3 = constraintGraph.addNode(
+    //     std::make_shared<Gcs::Element>(Gcs::Point { 5.0, 0.0 }));
+    // auto node4 = constraintGraph.addNode(
+    //     std::make_shared<Gcs::Element>(Gcs::Point { 5.0, 5.0 }));
+    //
+    // auto edge1 = constraintGraph.addEdge(node1, node2,
+    //     std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    // auto edge2 = constraintGraph.addEdge(node1, node3,
+    //     std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    // auto edge3 = constraintGraph.addEdge(node2, node4,
+    //     std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    // auto edge4 = constraintGraph.addEdge(node3, node4,
+    //     std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    // auto edge5 = constraintGraph.addEdge(node2, node3,
+    //     std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    //
+    // auto [sep1, sep2] = constraintGraph.getSeparationPairs();
+    // auto vec = constraintGraph.separateByVerticesByDuplication(
+    //     { sep1.value(), sep2.value() });
+    //
+    // MathUtils::Graph<Gcs::Element, Gcs::Constraint> checkProblems {
+    // std::move(
+    //     vec[0]) };
+    // checkProblems.getSeparationPairs();
+    //
+    // MathUtils::Graph<Gcs::Element, Gcs::Constraint> checkProblems2 {
+    // std::move(
+    //     vec[1]) };
+    // checkProblems2.getSeparationPairs();
 
     std::cout << "===========================" << std::endl;
 
     // Create a fresh constraint graph for testing defaultDecompositorFunc
     MathUtils::Graph<Gcs::Element, Gcs::Constraint> testGraph;
+    auto testNode0 = testGraph.addNode(
+        std::make_shared<Gcs::Element>(Gcs::Point { 0, 0 }));
     auto testNode1 = testGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 0.0 }));
+        std::make_shared<Gcs::Element>(Gcs::Point { 0, 0 }));
     auto testNode2 = testGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 5.0 }));
+        std::make_shared<Gcs::Element>(Gcs::Point { 0, 0 }));
     auto testNode3 = testGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 5.0, 0.0 }));
-    auto testNode4 = testGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 5.0, 5.0 }));
+        std::make_shared<Gcs::Element>(Gcs::Point { 0, 0 }));
 
-    auto testEdge1 = testGraph.addEdge(testNode1, testNode2,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    double squareSide = 5;
+    auto testEdge0 = testGraph.addEdge(testNode0, testNode1,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
+    auto testEdge1 = testGraph.addEdge(testNode0, testNode2,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
     auto testEdge2 = testGraph.addEdge(testNode1, testNode3,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
-    auto testEdge3 = testGraph.addEdge(testNode2, testNode4,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
-    auto testEdge4 = testGraph.addEdge(testNode3, testNode4,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
-    auto testEdge5 = testGraph.addEdge(testNode2, testNode3,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
+    auto testEdge3 = testGraph.addEdge(testNode2, testNode3,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
+    auto testEdge4 = testGraph.addEdge(testNode1, testNode2,
+        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
 
-    auto subGraphs = Gcs::defaultDecompositorFunc(testGraph);
-    std::cout << subGraphs.size() << std::endl;
+    // EXTRA: testing
+    // auto testNode4 = testGraph.addNode(
+    //     std::make_shared<Gcs::Element>(Gcs::Point { 5.0, 5.0 }));
+    // auto testEdge5 = testGraph.addEdge(testNode1, testNode4,
+    //     std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    // auto testEdge6 = testGraph.addEdge(testNode3, testNode4,
+    //     std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    //
+    // auto testNode5 = testGraph.addNode(
+    //     std::make_shared<Gcs::Element>(Gcs::Point { 5.0, 5.0 }));
+    // auto testEdge7 = testGraph.addEdge(testNode5, testNode2,
+    //     std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    // auto testEdge8 = testGraph.addEdge(testNode5, testNode3,
+    //     std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+
+    Gcs::GeometricConstraintSystem gcs {};
+    gcs.solveGcsViaPipeline(testGraph);
+    auto results = testGraph.getNodes();
+    for (const auto& node : results) {
+        std::cout << node.getStoredObj()->toString() << std::endl;
+    }
+
+    // auto firstOut = Solver::calculatePointToPointDistanceTriangle(5, 5, 5);
+    // auto secondOut
+    //     = Solver::calculatePointToPointDistanceTriangleFromTwoFixedPoints(
+    //         { 0, 0 }, { 5, 0 }, 5, 5);
+    //
+    // std::cout << std::format(
+    //     "Original function: x: {}, y: {}", firstOut.back().x,
+    //     firstOut.back().y)
+    //           << std::endl;
+    // std::cout << std::format(
+    //     "New function: x: {}, y: {}", secondOut.x, secondOut.y)
+    //           << std::endl;
+
+    std::cout << "===========================" << std::endl;
+
+    // MathUtils::Graph<Gcs::Element, Gcs::Constraint> testGraph;
+    // auto testNode0 = testGraph.addNode(
+    //     std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 0.0 }));
+    // auto testNode1 = testGraph.addNode(
+    //     std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 0.0 }));
+    // auto testNode2 = testGraph.addNode(
+    //     std::make_shared<Gcs::Element>(Gcs::Point { 0.0, 0.0 }));
+    //
+    // auto testEdge0 = testGraph.addEdge(testNode0, testNode1,
+    //     std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    // auto testEdge1 = testGraph.addEdge(testNode0, testNode2,
+    //     std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    // auto testEdge2 = testGraph.addEdge(testNode1, testNode2,
+    //     std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(5.0)));
+    //
+    // std::vector<Gcs::ConstraintGraph> testVector {};
+    // testVector.push_back(testGraph);
+    // Gcs::defaultSolverFunc(testVector);
+    // auto nodes { testGraph.getNodes() };
+    //
+    // for (const auto& node : nodes) {
+    //     std::cout << node.getStoredObj()->toString() << std::endl;
+    // }
 
     if (gui) { }
 

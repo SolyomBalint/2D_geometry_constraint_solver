@@ -3,24 +3,30 @@
 
 #include <string>
 #include <variant>
+#include <format>
 
 namespace Gcs {
 
 template <typename T>
 concept ElementType = requires(T element) {
     { element.getTypeName() } -> std::convertible_to<std::string>;
-    // TODO function concept for updateElementPosition
+    { element.toString() } -> std::convertible_to<std::string>;
 };
 
 struct Point {
-    float x, y;
-    explicit Point(float x_coord, float y_coord)
+    double x, y;
+    Point() { };
+    explicit Point(double x_coord, double y_coord)
         : x { x_coord }
         , y { y_coord }
     {
     }
     std::string getTypeName() const { return "Point"; }
-    void updateElementPosition(float new_x, float new_y)
+    std::string toString() const
+    {
+        return std::format("Point(x: {}, y: {})", x, y);
+    }
+    void updateElementPosition(double new_x, double new_y)
     {
         x = new_x;
         y = new_y;
@@ -28,16 +34,22 @@ struct Point {
 };
 
 struct FixedRadiusCircle {
-    float x, y;
-    float fixed_radius;
-    explicit FixedRadiusCircle(float x_coord, float y_coord, float r)
+    double x, y;
+    double fixed_radius;
+    FixedRadiusCircle() { };
+    explicit FixedRadiusCircle(double x_coord, double y_coord, double r)
         : x { x_coord }
         , y { y_coord }
         , fixed_radius { r }
     {
     }
     std::string getTypeName() const { return "FixedRadiusCircle"; }
-    void updateElementPosition(float new_x, float new_y)
+    std::string toString() const
+    {
+        return std::format(
+            "FixedRadiusCircle(x: {}, y: {}, radius: {})", x, y, fixed_radius);
+    }
+    void updateElementPosition(double new_x, double new_y)
     {
         x = new_x;
         y = new_y;
@@ -45,10 +57,11 @@ struct FixedRadiusCircle {
 };
 
 struct Line {
-    float r0_x, r0_y;
-    float v_x, v_y;
+    double r0_x, r0_y;
+    double v_x, v_y;
+    Line() { };
     explicit Line(
-        float r0_x_coord, float r0_y_coord, float v_x_dir, float v_y_dir)
+        double r0_x_coord, double r0_y_coord, double v_x_dir, double v_y_dir)
         : r0_x { r0_x_coord }
         , r0_y { r0_y_coord }
         , v_x { v_x_dir }
@@ -56,8 +69,13 @@ struct Line {
     {
     }
     std::string getTypeName() const { return "Line"; }
+    std::string toString() const
+    {
+        return std::format(
+            "Line(r0: ({}, {}), v: ({}, {}))", r0_x, r0_y, v_x, v_y);
+    }
     void updateElementPosition(
-        float new_r0_x, float new_r0_y, float new_v_x, float new_v_y)
+        double new_r0_x, double new_r0_y, double new_v_x, double new_v_y)
     {
         r0_x = new_r0_x;
         r0_y = new_r0_y;
@@ -71,6 +89,7 @@ template <ElementType... Types> using ElementInterface = std::variant<Types...>;
 class Element final {
 private:
     ElementInterface<Point, FixedRadiusCircle, Line> element;
+    bool isSet = false;
 
 public:
     template <typename T>
@@ -100,15 +119,36 @@ public:
             [](const auto& element) { return element.getTypeName(); }, element);
     }
 
+    std::string toString() const
+    {
+        return std::visit(
+            [](const auto& element) { return element.toString(); }, element);
+    }
+
+    template <typename T> T& getElement() { return std::get<T>(element); }
+
+    template <typename T> const T& getElement() const
+    {
+        return std::get<T>(element);
+    }
+
+    bool isElementSet() const { return isSet; }
+
     template <typename... Parameters>
     void updateElementPosition(Parameters&&... params)
     {
         std::visit(
-            [&params...](auto&& element) {
-                element.updateElementPosition(
-                    std::forward<Parameters>(params)...);
+            [&](auto&& element) -> void {
+                if constexpr (requires {
+                                  element.updateElementPosition(
+                                      std::forward<Parameters>(params)...);
+                              }) {
+                    element.updateElementPosition(
+                        std::forward<Parameters>(params)...);
+                }
             },
             element);
+        isSet = true;
     }
 };
 } // namespace Gcs

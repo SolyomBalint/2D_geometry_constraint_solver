@@ -22,12 +22,14 @@ autodiff::dual f(
 autodiff::dual g(autodiff::dual xCoord, autodiff::dual yCoord,
     const autodiff::dual& d1, const autodiff::dual& d2)
 {
-    return pow(d1 - xCoord, 2) + pow(-yCoord, 2) - pow(d2, 2);
+    return pow(d1 - xCoord, 2) + pow(yCoord, 2) - pow(d2, 2);
 }
 
-std::vector<Coordinates2D> calculatePointToPointDistanceTriangle(
-    const double xToYDistance, const double xToZDistance,
-    const double yToZDistance)
+// NOTE: this is hardcore code duplication, later when time is given, this
+// should be generalized
+std::tuple<Coordinates2D, Coordinates2D, Coordinates2D>
+calculatePointToPointDistanceTriangle(const double xToYDistance,
+    const double xToZDistance, const double yToZDistance)
 {
     using autodiff::at;
     using autodiff::derivative;
@@ -45,16 +47,16 @@ std::vector<Coordinates2D> calculatePointToPointDistanceTriangle(
     Eigen::Vector2d updatedVariableValues;
 
     for (auto i = 0; i < MAXIMUM_ITERATIONS; i++) {
-        jacobian << derivative(f, wrt(variableValues.x()),
-            at(variableValues.x(), variableValues.y(), xToZDistance)),
-            derivative(f, wrt(variableValues.y()),
-                at(variableValues.x(), variableValues.y(), xToZDistance)),
-            derivative(g, wrt(variableValues.x()),
-                at(variableValues.x(), variableValues.y(), xToYDistance,
-                    yToZDistance)),
-            derivative(g, wrt(variableValues.y()),
-                at(variableValues.x(), variableValues.y(), xToYDistance,
-                    yToZDistance));
+        jacobian(0, 0) = derivative(f, wrt(variableValues.x()),
+            at(variableValues.x(), variableValues.y(), xToZDistance));
+        jacobian(0, 1) = derivative(f, wrt(variableValues.y()),
+            at(variableValues.x(), variableValues.y(), xToZDistance));
+        jacobian(1, 0) = derivative(g, wrt(variableValues.x()),
+            at(variableValues.x(), variableValues.y(), xToYDistance,
+                yToZDistance));
+        jacobian(1, 1) = derivative(g, wrt(variableValues.y()),
+            at(variableValues.x(), variableValues.y(), xToYDistance,
+                yToZDistance));
 
         evaluatedFunctionValues = Eigen::Vector2d {
             -(f(variableValues.x(), variableValues.y(), xToZDistance).val),
@@ -66,12 +68,13 @@ std::vector<Coordinates2D> calculatePointToPointDistanceTriangle(
         // Solving J_f(x_k)s_k = -f(x_k)
         updatedVariableValues
             = jacobian.colPivHouseholderQr().solve(evaluatedFunctionValues);
-
         if (abs(prevValues.x() - variableValues.x()) < ERROR
             && abs(prevValues.y() - variableValues.y()) < ERROR) {
             break;
         }
-
+        // Claude suggestion, not sure about it
+        //  if (abs(updatedVariableValues[0]) < ERROR
+        //              && abs(updatedVariableValues[1]) < ERROR)
         prevValues = variableValues;
 
         // Calculating x_k+1 = x_k + s_k
@@ -86,5 +89,91 @@ std::vector<Coordinates2D> calculatePointToPointDistanceTriangle(
 
     return { Coordinates2D { 0, 0 }, Coordinates2D { xToYDistance, 0 },
         Coordinates2D { variableValues.x().val, variableValues.y().val } };
+}
+
+struct FunctionsForSolvingOneUknownPointDistance {
+    using dual = autodiff::dual;
+    static dual f(const dual& x1, const dual& y1, const dual& d3, dual xCoord,
+        dual yCoord)
+    {
+        return pow(xCoord - x1, 2) + pow(yCoord - y1, 2) - pow(d3, 2);
+    }
+    static dual g(const dual& x2, const dual& y2, const dual& d2, dual xCoord,
+        dual yCoord)
+    {
+        return pow(xCoord - x2, 2) + pow(yCoord - y2, 2) - pow(d2, 2);
+    }
+};
+
+Coordinates2D calculatePointToPointDistanceTriangleFromTwoFixedPoints(
+    const Coordinates2D& p1, const Coordinates2D& p2, const double distanceP2P3,
+    const double distanceP1P3)
+{
+    using autodiff::at;
+    using autodiff::derivative;
+    using autodiff::dual;
+    using autodiff::wrt;
+    using Dual2DColVector = Eigen::Matrix<dual, 2, 1>;
+
+    FunctionsForSolvingOneUknownPointDistance functions;
+
+    // Variables are given a starting non-zero value, later this could be more
+    // sophisticated
+    Dual2DColVector variableValues = { 10, 10 };
+    Dual2DColVector prevValues = { 0, 0 };
+
+    Eigen::Matrix2d jacobian;
+    Eigen::Vector2d evaluatedFunctionValues;
+    Eigen::Vector2d updatedVariableValues;
+
+    for (auto i = 0; i < MAXIMUM_ITERATIONS; i++) {
+        jacobian(0, 0) = derivative(functions.f, wrt(variableValues.x()),
+            at(p1.x, p1.y, distanceP1P3, variableValues.x(),
+                variableValues.y()));
+        jacobian(0, 1) = derivative(functions.f, wrt(variableValues.y()),
+            at(p1.x, p1.y, distanceP1P3, variableValues.x(),
+                variableValues.y()));
+        jacobian(1, 0) = derivative(functions.g, wrt(variableValues.x()),
+            at(p2.x, p2.y, distanceP2P3, variableValues.x(),
+                variableValues.y()));
+        jacobian(1, 1) = derivative(functions.g, wrt(variableValues.y()),
+            at(p2.x, p2.y, distanceP2P3, variableValues.x(),
+                variableValues.y()));
+
+        evaluatedFunctionValues = Eigen::Vector2d {
+            -(functions
+                    .f(p1.x, p1.y, distanceP1P3, variableValues.x(),
+                        variableValues.y())
+                    .val),
+            -(functions
+                    .g(p2.x, p2.y, distanceP2P3, variableValues.x(),
+                        variableValues.y())
+                    .val)
+        };
+
+        // Solving J_f(x_k)s_k = -f(x_k)
+        updatedVariableValues
+            = jacobian.colPivHouseholderQr().solve(evaluatedFunctionValues);
+        if (abs(prevValues.x() - variableValues.x()) < ERROR
+            && abs(prevValues.y() - variableValues.y()) < ERROR) {
+            break;
+        }
+        // Claude suggestion, not sure about it
+        //  if (abs(updatedVariableValues[0]) < ERROR
+        //             && abs(updatedVariableValues[1]) < ERROR)
+
+        prevValues = variableValues;
+
+        // Calculating x_k+1 = x_k + s_k
+        variableValues.x() += dual(updatedVariableValues[0]);
+        variableValues.y() += dual(updatedVariableValues[1]);
+    }
+
+    SOLVER_LOGGER->debug(
+        std::format("The calculated result of the two variable equation system "
+                    "is: x: {}, y: {} \n",
+            variableValues.x().val, variableValues.y().val));
+
+    return Coordinates2D { variableValues.x().val, variableValues.y().val };
 }
 } // namespace Solver
