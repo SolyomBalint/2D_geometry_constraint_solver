@@ -119,7 +119,7 @@ Coordinates2D calculatePointToPointDistanceTriangleFromTwoFixedPoints(
 
     // Variables are given a starting non-zero value, later this could be more
     // sophisticated
-    Dual2DColVector variableValues = { 10, 10 };
+    Dual2DColVector variableValues = { 2000, 2000 };
     Dual2DColVector prevValues = { 0, 0 };
 
     Eigen::Matrix2d jacobian;

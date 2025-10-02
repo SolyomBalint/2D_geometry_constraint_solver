@@ -77,6 +77,7 @@ in
     (python313.withPackages (ps: with ps; [ graph-tool ]))
     ### For graph_tool
     gtk3
+    gsettings-desktop-schemas
     librsvg
     glib
     gobject-introspection
@@ -135,5 +136,15 @@ in
         $CONAN_CMD
     fi
     echo
+
+    if [ -d "$DEVENV_ROOT/local_node_dev_tools" ] && [[ ":$PATH:" != *":$DIR:"* ]]; then
+    echo "Adding local installiation claude-code binary to PATH"
+    echo $DEVENV_ROOT
+    export PATH="$PATH:$DEVENV_ROOT/local_node_dev_tools/node_modules/.bin"
+    fi
+    echo
+
+    export XDG_DATA_DIRS="${pkgs_unstable.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs_unstable.gsettings-desktop-schemas.name}:${pkgs_unstable.gtk3}/share/gsettings-schemas/${pkgs_unstable.gtk3.name}:$XDG_DATA_DIRS"
+    export GI_TYPELIB_PATH="${pkgs_unstable.gtk3}/lib/girepository-1.0:${pkgs_unstable.gobject-introspection}/lib/girepository-1.0:$GI_TYPELIB_PATH"
   '';
 }

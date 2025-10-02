@@ -12,7 +12,9 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def __init__(self, application):
         # Connect to the application
-        super().__init__(application=application, title="Geometric Constraint Solver")
+        super().__init__(
+            application=application, title="Geometric Constraint Solver"
+        )
 
         self.set_default_size(1920, 1200)
 
@@ -23,7 +25,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self.set_titlebar(self.header)
 
         # Add a menu button to the header
-        menu_button = Gtk.Button.new_from_icon_name("open-menu-symbolic", Gtk.IconSize.BUTTON)
+        menu_button = Gtk.Button.new_from_icon_name(
+            "open-menu-symbolic", Gtk.IconSize.BUTTON
+        )
         menu_button.connect("clicked", self.on_menu_clicked)
         self.header.pack_end(menu_button)
 
@@ -44,10 +48,12 @@ class MainWindow(Gtk.ApplicationWindow):
         self.gcs_data = gcs.GeometricConstraintSystem(self.shape_data)
 
         # Create drawing area
-        drawing_area = drawmodelview.DrawingLayout(self.shape_data)
+        drawing_area = drawmodelview.DrawingLayout(
+            self.shape_data, self.gcs_data
+        )
 
         # Create graph rendering
-        graph_render = gcsview.own_small_example()
+        graph_render = gcsview.create_constraint_graph_view(self.gcs_data)
 
         stack.add_titled(drawing_area, "Draw Model", "Draw Model")
         stack.add_titled(graph_render, "Graph Rendering", "Graph Rendering")
@@ -96,7 +102,9 @@ class MainWindow(Gtk.ApplicationWindow):
         about_dialog.set_program_name("Geometric Constraint Solver")
         about_dialog.set_version("0.0")
         about_dialog.set_authors(["Bálint Sólyom", "Dr. Vatikus Márton"])
-        about_dialog.set_comments("A tool for solving geometric constraint systems")
+        about_dialog.set_comments(
+            "A tool for solving geometric constraint systems"
+        )
         about_dialog.set_copyright("© 2025")
         about_dialog.run()
         about_dialog.destroy()

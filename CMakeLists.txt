@@ -70,6 +70,26 @@ if(GENERATE_PYTHON_BINDINGS)
 
     target_compile_definitions(equation_system_solver_binding PRIVATE SPDLOG_USE_STD_FORMAT)
     target_link_libraries(equation_system_solver_binding PRIVATE spdlog::spdlog autodiff::autodiff Eigen3::Eigen)
+
+    # Simple Constraint Graph binding (replacement for the faulty constraint_graph_binding)
+    nanobind_add_module(simple_constraint_graph_binding NOMINSIZE
+                        src/python_bindings/simple_constraint_graph_binding.cpp
+                        src/python_bindings/simple_constraint_graph.cpp
+                        src/python_bindings/constraint_graph_converter.cpp
+                        src/constraint_solver/geometric_constraint_system.cpp
+                        src/constraint_solver/constraint_equation_solver.cpp
+                        src/common/common/common_uuid.cpp)
+    target_include_directories(simple_constraint_graph_binding PRIVATE
+                src/common
+                src/utils
+                ${spdlog_INCLUDE_DIRS}
+                ${ogdf_INCLUDE_DIRS}
+                ${stduuid_INCLUDE_DIRS}
+                ${autodiff_INCLUDE_DIRS}
+                ${Eigen3_INCLUDE_DIRS})
+
+    target_compile_definitions(simple_constraint_graph_binding PRIVATE SPDLOG_USE_STD_FORMAT LIBUUID_CPP20_OR_GREATER)
+    target_link_libraries(simple_constraint_graph_binding PRIVATE spdlog::spdlog ogdf::ogdf stduuid::stduuid autodiff::autodiff Eigen3::Eigen)
 endif()
 
 ######################## Optionally setting up nanobind for python binding generation ########################
