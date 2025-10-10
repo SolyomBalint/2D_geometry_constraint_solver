@@ -55,8 +55,8 @@ in
     gcc15
     gnumake
     cmake
-    llvmPackages_20.clang-tools
-    llvmPackages_20.clangNoCompilerRtWithLibc # in the local environemnt the goal is to be able to use both compilers
+    llvmPackages_latest.clang-tools
+    llvmPackages_latest.clangNoCompilerRtWithLibc # in the local environemnt the goal is to be able to use both compilers
     # for checking for mistakes, so we leave out the LLVM cpp libs to avoid linking issues
     gdb
     ninja
@@ -67,11 +67,6 @@ in
     valgrind
     virtualglLib
     sass
-
-    ## Build deps
-    # spdlog # MIT licence
-    # argparse # MIT licence
-    # stduuid
 
     ## Example gui dependencies
     (python313.withPackages (ps: with ps; [ graph-tool ]))
@@ -134,13 +129,6 @@ in
         echo "Directory doesn't exist or is empty, creating conan profile"
         echo "Executing: $CONAN_CMD"
         $CONAN_CMD
-    fi
-    echo
-
-    if [ -d "$DEVENV_ROOT/local_node_dev_tools" ] && [[ ":$PATH:" != *":$DIR:"* ]]; then
-    echo "Adding local installiation claude-code binary to PATH"
-    echo $DEVENV_ROOT
-    export PATH="$PATH:$DEVENV_ROOT/local_node_dev_tools/node_modules/.bin"
     fi
     echo
 

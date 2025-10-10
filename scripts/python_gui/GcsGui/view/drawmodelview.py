@@ -582,10 +582,8 @@ class DrawingLayout(Gtk.Grid):
 
             print(f"Canvas size: {canvas_width}x{canvas_height}, center: ({canvas_center_x:.2f}, {canvas_center_y:.2f})")
 
-            # Call the C++ solver with canvas center coordinates
-            success = self.drawing_area.gcs_system.solve_constraint_graph(
-                canvas_center_x, canvas_center_y
-            )
+            # Call the C++ solver
+            success = self.drawing_area.gcs_system.solve_constraint_graph()
 
             if success:
                 print(f"✓ Constraint solving completed")

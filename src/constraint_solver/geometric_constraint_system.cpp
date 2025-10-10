@@ -38,42 +38,45 @@ namespace {
     {
         auto nodes = subGraph.getNodes();
 
-        // DEBUG
-        getGcsLogger()->debug("From the zero known points functions: Elements");
-        for (const auto& node : nodes) {
-            getGcsLogger()->debug(node.getStoredObj()->toString());
-        }
-        getGcsLogger()->debug(
-            "From the zero known points functions: Constraints");
-        for (const auto& edge : subGraph.getEdges()) {
-            getGcsLogger()->debug(edge.getStoredObj()->getConstraintValue());
-        }
-        // DEBUG
+        // for (const auto& node : nodes) {
+        //     getGcsLogger()->debug(node.getStoredObj()->toString());
+        // }
+        //
+        // for (const auto& edge : subGraph.getEdges()) {
+        //     getGcsLogger()->debug(edge.getStoredObj()->getConstraintValue());
+        // }
 
-        auto p1 = nodes.at(point1Index);
-        auto p2 = nodes.at(point2Index);
-        auto p3 = nodes.at(point3Index);
+        auto node1 = nodes.at(point1Index);
+        auto node2 = nodes.at(point2Index);
+        auto node3 = nodes.at(point3Index);
 
-        const auto xToYDistance = subGraph.getEdgeBetweenNodes(p1, p2)
+        Point p1 = node1.getStoredObj()->getElement<Point>();
+        Point p2 = node2.getStoredObj()->getElement<Point>();
+        Point p3 = node3.getStoredObj()->getElement<Point>();
+
+        const auto xToYDistance = subGraph.getEdgeBetweenNodes(node1, node2)
                                       .value()
                                       .getStoredObj()
                                       ->getConstraintValue();
-        const auto xToZDistance = subGraph.getEdgeBetweenNodes(p1, p3)
+        const auto xToZDistance = subGraph.getEdgeBetweenNodes(node1, node3)
                                       .value()
                                       .getStoredObj()
                                       ->getConstraintValue();
-        const auto yToZDistance = subGraph.getEdgeBetweenNodes(p2, p3)
+        const auto yToZDistance = subGraph.getEdgeBetweenNodes(node2, node3)
                                       .value()
                                       .getStoredObj()
                                       ->getConstraintValue();
 
         const auto [p1Coords, p2Coords, p3Coords]
-            = Solver::calculatePointToPointDistanceTriangle(
-                xToYDistance, xToZDistance, yToZDistance);
+            = Solver::calculatePointToPointDistanceTriangle(xToYDistance,
+                xToZDistance, yToZDistance,
+                { { p1.OiriginalXOnCanvas, p1.OriginalYOnCanvas },
+                    { p2.OiriginalXOnCanvas, p2.OriginalYOnCanvas },
+                    { p3.OiriginalXOnCanvas, p3.OriginalYOnCanvas } });
 
-        p1.getStoredObj()->updateElementPosition(p1Coords.x, p1Coords.y);
-        p2.getStoredObj()->updateElementPosition(p2Coords.x, p2Coords.y);
-        p3.getStoredObj()->updateElementPosition(p3Coords.x, p3Coords.y);
+        node1.getStoredObj()->updateElementPosition(p1Coords.x, p1Coords.y);
+        node2.getStoredObj()->updateElementPosition(p2Coords.x, p2Coords.y);
+        node3.getStoredObj()->updateElementPosition(p3Coords.x, p3Coords.y);
     }
 
     void solveFromTwoCalculatedNodes(ConstraintGraph& subGraph)
@@ -97,28 +100,21 @@ namespace {
             throw std::runtime_error(
                 "Trying to solve triangle with more than two solved elements");
         }
-        // debug
-        getGcsLogger()->debug(
-            "From the two known points functions: Set Elements");
-        for (const auto& node : setElemnts) {
-            getGcsLogger()->debug(node.getStoredObj()->toString());
-        }
 
-        getGcsLogger()->debug(
-            "From the two known points functions: not Element");
-        getGcsLogger()->debug(notSetElement.getStoredObj()->toString());
-
-        getGcsLogger()->debug(
-            "From the two known points functions: Constraints");
-        for (const auto& edge : subGraph.getEdges()) {
-            getGcsLogger()->debug(edge.getStoredObj()->getConstraintValue());
-        }
+        // for (const auto& node : setElemnts) {
+        //     getGcsLogger()->debug(node.getStoredObj()->toString());
+        // }
+        //
+        // for (const auto& edge : subGraph.getEdges()) {
+        //     getGcsLogger()->debug(edge.getStoredObj()->getConstraintValue());
+        // }
         // debug
 
         auto p1ToP3Distance
             = subGraph.getEdgeBetweenNodes(setElemnts.front(), notSetElement)
                   ->getStoredObj()
                   ->getConstraintValue();
+        // fails in 116
         auto p2ToP3Distance
             = subGraph.getEdgeBetweenNodes(setElemnts.back(), notSetElement)
                   ->getStoredObj()
@@ -126,10 +122,14 @@ namespace {
 
         Point p1 { setElemnts.front().getStoredObj()->getElement<Point>() };
         Point p2 { setElemnts.back().getStoredObj()->getElement<Point>() };
+        Point p3 { notSetElement.getStoredObj()->getElement<Point>() };
 
         auto outPutCoords
             = Solver::calculatePointToPointDistanceTriangleFromTwoFixedPoints(
-                { p1.x, p1.y }, { p2.x, p2.y }, p2ToP3Distance, p1ToP3Distance);
+                { p1.x, p1.y }, { p2.x, p2.y }, p2ToP3Distance, p1ToP3Distance,
+                { { p1.OiriginalXOnCanvas, p1.OriginalYOnCanvas },
+                    { p2.OiriginalXOnCanvas, p2.OriginalYOnCanvas },
+                    { p3.OiriginalXOnCanvas, p3.OriginalYOnCanvas } });
 
         notSetElement.getStoredObj()->updateElementPosition(
             outPutCoords.x, outPutCoords.y);
@@ -168,13 +168,13 @@ std::vector<ConstraintGraph> defaultDecompositorFunc(
 
         if (separationPair.first.has_value()
             && separationPair.second.has_value()) {
-            getGcsLogger()->debug(
-                "separation pairs found in graph, separating...");
+            // getGcsLogger()->debug(
+            //     "separation pairs found in graph, separating...");
             return graph.separateByVerticesByDuplication(
                 { separationPair.first.value(),
                     separationPair.second.value() });
         } else {
-            getGcsLogger()->debug("No separation pairs found in graph");
+            // getGcsLogger()->debug("No separation pairs found in graph");
             return {};
         }
     };
@@ -259,9 +259,25 @@ void GeometricConstraintSystem::solveGcsViaPipeline(
     }
 
     auto subraphs = graphDecompositor(constraintGraph);
+    getGcsLogger()->debug("============================================");
+    // getGcsLogger()->debug("============================================");
+    // getGcsLogger()->debug("Number of found subgraphs: {}", subraphs.size());
+    // int count { 0 };
+    // for (const auto& graph : subraphs) {
+    //     getGcsLogger()->debug("subgraphs: {}", count++);
+    //     const auto& nodes = graph.getNodes();
+    //     for (const auto& node : graph.getNodes()) {
+    //         std::cerr << node.getStoredObj().get() << std::endl;
+    //     }
+    //
+    //     getGcsLogger()->debug("getting edges between nodes");
+    //
+    //     for (const auto& edge : graph.getEdges()) {
+    //         std::cerr << edge.getStoredObj().get() << std::endl;
+    //     }
+    // }
 
-    getGcsLogger()->debug("Number of subgraphs {}", subraphs.size());
-
+    getGcsLogger()->debug("============================================");
     subgraphSolver(subraphs);
 }
 

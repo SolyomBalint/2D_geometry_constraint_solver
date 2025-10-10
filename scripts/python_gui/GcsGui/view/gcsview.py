@@ -1,4 +1,5 @@
 import gi
+import gc
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
@@ -20,6 +21,9 @@ class ConstraintGraphWidget(Gtk.Box):
         # Store decomposed subgraphs
         self.decomposed_subgraphs = []
         self.showing_decomposed = False
+
+        # Connect destroy signal for cleanup
+        self.connect("destroy", self.on_widget_destroy)
 
         # Create info label
         self.info_label = Gtk.Label()
@@ -63,6 +67,14 @@ class ConstraintGraphWidget(Gtk.Box):
         # Start periodic update
         GLib.timeout_add(1000, self.update_graph_display)  # Update every second
 
+    def on_widget_destroy(self, widget):
+        """Cleanup resources when widget is destroyed"""
+        # Clear decomposed subgraphs to release C++ references
+        self.decomposed_subgraphs.clear()
+        self.gcs_system = None
+        # Force garbage collection
+        gc.collect()
+
     def on_decompose_clicked(self, button):
         """Handle decompose button click"""
         if self.gcs_system is None:
@@ -70,37 +82,166 @@ class ConstraintGraphWidget(Gtk.Box):
             return
 
         print("Decompose button clicked")
-        self.decomposed_subgraphs = self.gcs_system.decompose_constraint_graph()
 
-        if len(self.decomposed_subgraphs) > 0:
+        # Clear any previous decomposition
+        self.decomposed_subgraphs.clear()
+
+        # Get decomposed subgraphs (expensive operation, only done on button click)
+        subgraphs = self.gcs_system.get_decomposed_subgraphs()
+
+        if subgraphs and len(subgraphs) > 1:
+            print(f"✓ Graph decomposes into {len(subgraphs)} subgraphs")
+            for i, sg in enumerate(subgraphs):
+                print(f"  Subgraph {i}: {len(sg.nodes)} nodes, {len(sg.edges)} edges")
+
+            # Store the decomposed subgraphs and render them
+            self.decomposed_subgraphs = subgraphs
             self.showing_decomposed = True
             self.show_original_button.set_sensitive(True)
-            self.update_decomposed_graph_display()
+
+            # Render the decomposed subgraphs
+            self.render_decomposed_subgraphs()
+
         else:
-            print("✗ No subgraphs returned from decomposition")
+            print("✗ Graph does not decompose or is triconnected")
+            dialog = Gtk.MessageDialog(
+                transient_for=None,
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text="Graph Decomposition"
+            )
+            if len(subgraphs) == 0:
+                dialog.format_secondary_text(
+                    "The graph is triconnected and does not decompose into subgraphs."
+                )
+            else:
+                dialog.format_secondary_text(
+                    "The graph is already a single connected component."
+                )
+            dialog.run()
+            dialog.destroy()
+
+    def render_decomposed_subgraphs(self):
+        """Render decomposed subgraphs as a combined disconnected graph"""
+        if not self.decomposed_subgraphs:
+            return
+
+        try:
+            # Remove old graph widget
+            if self.graph_widget is not None:
+                self.remove(self.graph_widget)
+
+            # Create a single combined graph
+            combined_graph = Graph(directed=False)
+
+            # Create properties
+            vertex_text = combined_graph.new_vertex_property("string")
+            vertex_color = combined_graph.new_vertex_property("vector<double>")
+            vertex_size = combined_graph.new_vertex_property("double")
+            edge_text = combined_graph.new_edge_property("string")
+
+            # Different colors for each subgraph
+            subgraph_colors = [
+                [0.8, 0.4, 0.2, 1.0],  # Orange
+                [0.2, 0.8, 0.4, 1.0],  # Green
+                [0.4, 0.2, 0.8, 1.0],  # Purple
+                [0.8, 0.2, 0.4, 1.0],  # Pink
+                [0.2, 0.4, 0.8, 1.0],  # Blue
+                [0.8, 0.8, 0.2, 1.0],  # Yellow
+            ]
+
+            # Global vertex counter (for labeling)
+            global_vertex_id = 0
+
+            # Process each subgraph
+            for subgraph_idx, subgraph in enumerate(self.decomposed_subgraphs):
+                color = subgraph_colors[subgraph_idx % len(subgraph_colors)]
+
+                # Map from subgraph's local nodeId to graph-tool vertex
+                local_node_to_vertex = {}
+
+                # Add vertices for this subgraph
+                for node in subgraph.nodes:
+                    v = combined_graph.add_vertex()
+                    local_node_to_vertex[node.nodeId] = v
+                    vertex_text[v] = f"{node.type}{global_vertex_id}"
+                    vertex_color[v] = color
+                    vertex_size[v] = 50
+                    global_vertex_id += 1
+
+                # Add edges for this subgraph
+                for edge in subgraph.edges:
+                    if edge.nodeId1 in local_node_to_vertex and edge.nodeId2 in local_node_to_vertex:
+                        v1 = local_node_to_vertex[edge.nodeId1]
+                        v2 = local_node_to_vertex[edge.nodeId2]
+                        e = combined_graph.add_edge(v1, v2)
+                        edge_text[e] = f"{edge.type}: {edge.value:.1f}"
+
+            # Create layout
+            if combined_graph.num_vertices() > 0:
+                try:
+                    # SFDP layout handles disconnected components well
+                    pos = sfdp_layout(combined_graph, K=1.0, max_iter=100)
+                except Exception:
+                    # Fallback to manual positioning
+                    pos = combined_graph.new_vertex_property("vector<double>")
+                    import math
+                    for i, v in enumerate(combined_graph.vertices()):
+                        angle = 2 * math.pi * i / combined_graph.num_vertices()
+                        pos[v] = [50 * math.cos(angle), 50 * math.sin(angle)]
+
+                # Create info label
+                info_text = f"Decomposed into {len(self.decomposed_subgraphs)} subgraphs"
+
+                # Create GraphWidget
+                self.graph_widget = GraphWidget(
+                    combined_graph,
+                    pos,
+                    vertex_text=vertex_text,
+                    vertex_fill_color=vertex_color,
+                    vertex_size=vertex_size,
+                    edge_text=edge_text,
+                    vertex_font_size=15,
+                    edge_font_size=12,
+                )
+                self.pack_start(self.graph_widget, True, True, 5)
+                self.show_all()
+
+                print(f"✓ Displayed {len(self.decomposed_subgraphs)} decomposed subgraphs in combined view")
+            else:
+                self.graph_widget = Gtk.Label("No vertices in decomposed subgraphs")
+                self.pack_start(self.graph_widget, True, True, 5)
+                self.show_all()
+
+        except Exception as e:
+            print(f"✗ Error rendering decomposed graphs: {e}")
+            import traceback
+            traceback.print_exc()
 
     def on_show_original_clicked(self, button):
         """Handle show original button click"""
         self.showing_decomposed = False
         self.show_original_button.set_sensitive(False)
+        # Clear decomposed subgraphs to release memory
+        self.decomposed_subgraphs.clear()
+        # Force garbage collection
+        gc.collect()
         # Force update of the graph display
         self.last_node_count = -1
         self.last_edge_count = -1
+        # Trigger immediate update
+        self.update_graph_display()
 
     def on_rearrange_clicked(self, button):
         """Handle rearrange layout button click"""
         print("Rearrange layout button clicked")
 
-        # Force redraw based on current view mode
-        if self.showing_decomposed and len(self.decomposed_subgraphs) > 0:
-            # Redraw decomposed view
-            self.update_decomposed_graph_display()
-        else:
-            # Force redraw of original graph
-            self.last_node_count = -1
-            self.last_edge_count = -1
-            # Trigger immediate update
-            self.update_graph_display()
+        # Force redraw of graph
+        self.last_node_count = -1
+        self.last_edge_count = -1
+        # Trigger immediate update
+        self.update_graph_display()
 
     def create_empty_graph_widget(self):
         """Create an empty graph widget for initial display"""
@@ -119,10 +260,6 @@ class ConstraintGraphWidget(Gtk.Box):
         if self.gcs_system is None:
             return True  # Continue the timer
 
-        # If showing decomposed graphs, don't update automatically
-        if self.showing_decomposed:
-            return True
-
         try:
             # Get current graph info
             info = self.gcs_system.get_constraint_graph_info()
@@ -130,9 +267,13 @@ class ConstraintGraphWidget(Gtk.Box):
             # Always update status labels
             self.nodes_label.set_text(f"Nodes: {info['nodes']}")
             self.edges_label.set_text(f"Edges: {info['edges']}")
-            self.subgraphs_label.set_text(
-                f"Subgraph sizes: {info['subgraph_sizes']}"
-            )
+            # Only show subgraph info if it's been computed (not empty)
+            if info.get('subgraph_sizes'):
+                self.subgraphs_label.set_text(
+                    f"Subgraph sizes: {info['subgraph_sizes']}"
+                )
+            else:
+                self.subgraphs_label.set_text("Subgraph sizes: [Click Decompose]")
 
             # Only update graph visualization if the graph structure has changed
             if (
@@ -142,6 +283,14 @@ class ConstraintGraphWidget(Gtk.Box):
                 print(
                     f"Graph structure changed: nodes {self.last_node_count} -> {info['nodes']}, edges {self.last_edge_count} -> {info['edges']}"
                 )
+
+                # Clear old decomposed subgraphs if graph changed
+                if self.decomposed_subgraphs:
+                    self.decomposed_subgraphs.clear()
+                    self.showing_decomposed = False
+                    self.show_original_button.set_sensitive(False)
+                    # Force garbage collection to release C++ objects
+                    gc.collect()
 
                 # Update visualization
                 if info["nodes"] > 0:
@@ -369,10 +518,9 @@ class ConstraintGraphWidget(Gtk.Box):
     def update_graph_visualization(self, info):
         """Update the actual graph visualization"""
         try:
-            # Get the actual constraint graph data
-            constraint_graph = self.gcs_system.constraint_graph
-            nodes = constraint_graph.get_nodes()
-            edges = constraint_graph.get_edges()
+            # Get the actual constraint graph data from the new API
+            nodes = self.gcs_system.get_graph_nodes()
+            edges = self.gcs_system.get_graph_edges()
 
             # Create a new graph for visualization
             indirected_graph = Graph(directed=False)
@@ -389,32 +537,31 @@ class ConstraintGraphWidget(Gtk.Box):
 
             # Add vertices (nodes) with actual data
             vertices = []
-            vertex_id_map = (
-                {}
-            )  # Map from constraint graph node IDs to graph vertices
+            vertex_id_map = {}  # Map from constraint graph node IDs to graph vertices
 
-            for i, node in enumerate(nodes):
-                if node is not None:  # Skip removed nodes
-                    v = indirected_graph.add_vertex()
-                    vertices.append(v)
-                    vertex_id_map[i] = v
+            for node in nodes:
+                # NodeInfo has: nodeId, type, data
+                v = indirected_graph.add_vertex()
+                vertices.append(v)
+                vertex_id_map[node.nodeId] = v
 
-                    # Set node label based on element type
-                    vertex_text[v] = node.type
+                # Set node label based on element type
+                vertex_text[v] = node.type
 
-                    # Set node color (blue) and size
-                    vertex_color[v] = [0.2, 0.4, 0.8, 1.0]  # Blue color (RGBA)
-                    vertex_size[v] = 50  # Bigger size
+                # Set node color (blue) and size
+                vertex_color[v] = [0.2, 0.4, 0.8, 1.0]  # Blue color (RGBA)
+                vertex_size[v] = 50  # Bigger size
 
             # Add edges (constraints) with actual data
-            for node_id1, node_id2, constraint in edges:
-                if node_id1 in vertex_id_map and node_id2 in vertex_id_map:
-                    v1 = vertex_id_map[node_id1]
-                    v2 = vertex_id_map[node_id2]
+            for edge in edges:
+                # EdgeInfo has: nodeId1, nodeId2, type, value
+                if edge.nodeId1 in vertex_id_map and edge.nodeId2 in vertex_id_map:
+                    v1 = vertex_id_map[edge.nodeId1]
+                    v2 = vertex_id_map[edge.nodeId2]
                     e = indirected_graph.add_edge(v1, v2)
 
                     # Set edge label with constraint type and value
-                    edge_text[e] = f"{constraint.type}: {constraint.value:.1f}"
+                    edge_text[e] = f"{edge.type}: {edge.value:.1f}"
 
             # Create layout with error handling
             if len(vertices) > 0:

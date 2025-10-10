@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import gc
 
 import gi
 
@@ -18,6 +19,7 @@ class GeometricConstraintSolverApp(Gtk.Application):
 
         # Connect to application signals
         self.connect("activate", self.on_activate)
+        self.connect("shutdown", self.on_shutdown)
 
     def on_activate(self, app):
         # Check if we already have a window
@@ -56,10 +58,26 @@ class GeometricConstraintSolverApp(Gtk.Application):
 
         self.set_accels_for_action("app.quit", ["<Ctrl>Q"])
 
+    def on_shutdown(self, app):
+        """Handle application shutdown - cleanup resources"""
+        # Force garbage collection multiple times to help cleanup Python/C++ bindings
+        gc.collect()
+        gc.collect()
+        gc.collect()
+
 
 def main():
     app = GeometricConstraintSolverApp()
     exit_status = app.run(sys.argv)
+
+    # Explicitly delete app and force garbage collection
+    # This helps cleanup Python/C++ bindings before interpreter shutdown
+    del app
+    # Run GC multiple times to ensure all cyclic references are broken
+    gc.collect()
+    gc.collect()
+    gc.collect()
+
     sys.exit(exit_status)
 
 

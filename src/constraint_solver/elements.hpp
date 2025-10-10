@@ -14,17 +14,22 @@ concept ElementType = requires(T element) {
 };
 
 struct Point {
+    double OiriginalXOnCanvas;
+    double OriginalYOnCanvas;
     double x, y;
     Point() { };
-    explicit Point(double x_coord, double y_coord)
-        : x { x_coord }
-        , y { y_coord }
+    explicit Point(double xCoordCanvas, double yCoordCanvas)
+        : OiriginalXOnCanvas { xCoordCanvas }
+        , OriginalYOnCanvas { yCoordCanvas }
+        , x { 0 }
+        , y { 0 }
     {
     }
     std::string getTypeName() const { return "Point"; }
     std::string toString() const
     {
-        return std::format("Point(x: {}, y: {})", x, y);
+        return std::format("CanvasCoords({},{}), Calculated({},{})",
+            OiriginalXOnCanvas, OriginalYOnCanvas, x, y);
     }
     void updateElementPosition(double new_x, double new_y)
     {

@@ -63,8 +63,18 @@ class MainWindow(Gtk.ApplicationWindow):
         stack_switcher.set_stack(stack)
         self.header.pack_start(stack_switcher)
 
+        # Connect destroy signal for cleanup
+        self.connect("destroy", self.on_window_destroy)
+
         # Show all widgets
         self.show_all()
+
+    def on_window_destroy(self, widget):
+        """Cleanup resources when window is destroyed"""
+        if hasattr(self, 'gcs_data') and self.gcs_data is not None:
+            self.gcs_data.cleanup()
+        if hasattr(self, 'shape_data') and self.shape_data is not None:
+            self.shape_data.shape_buffer.clear()
 
     def on_clear_clicked(self, button):
         self.drawing_area.clear_canvas()

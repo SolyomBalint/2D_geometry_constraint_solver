@@ -6,137 +6,52 @@ import json
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../../../build/Debug'))
 
 BINDINGS_AVAILABLE = False
-scg = None
+gcs_handle = None
 
 try:
-    import simple_constraint_graph_binding as scg
+    import constraint_graph_handle_binding as gcs_handle
     BINDINGS_AVAILABLE = True
-    print("✓ Successfully imported simple_constraint_graph_binding")
+    print("✓ Successfully imported constraint_graph_handle_binding")
 except ImportError as e:
-    print(f"✗ Failed to import simple_constraint_graph_binding: {e}")
-    print("  Falling back to Python-only implementation")
+    print(f"✗ Failed to import constraint_graph_handle_binding: {e}")
+    print("  GUI will operate in limited mode without solver")
     BINDINGS_AVAILABLE = False
 
 from . import drawmodel
 
 
-class SimpleElement:
-    """Python representation of SimpleElement for constraint graph"""
-
-    def __init__(self, element_type, data):
-        self.type = element_type  # 'Point', 'Circle', 'Line'
-        self.data = data  # List of coordinate/parameter data
-
-    @classmethod
-    def create_point(cls, x, y):
-        return cls("Point", [x, y])
-
-    @classmethod
-    def create_circle(cls, x, y, radius):
-        return cls("Circle", [x, y, radius])
-
-    @classmethod
-    def create_line(cls, r0_x, r0_y, v_x, v_y):
-        return cls("Line", [r0_x, r0_y, v_x, v_y])
-
-
-class SimpleConstraint:
-    """Python representation of SimpleConstraint for constraint graph"""
-
-    def __init__(self, constraint_type, value):
-        self.type = constraint_type  # 'Distance', 'Tangency'
-        self.value = value
-
-    @classmethod
-    def create_distance(cls, value):
-        return cls("Distance", value)
-
-    @classmethod
-    def create_tangency(cls, value):
-        return cls("Tangency", value)
-
-
-class SimpleConstraintGraph:
-    """Python-based constraint graph that can be converted to C++ later"""
-
-    def __init__(self):
-        self.nodes = []  # List of SimpleElement
-        self.edges = []  # List of (node_id1, node_id2, SimpleConstraint)
-        self.next_node_id = 0
-
-    def add_node(self, element):
-        """Add a node and return its ID"""
-        self.nodes.append(element)
-        node_id = self.next_node_id
-        self.next_node_id += 1
-        return node_id
-
-    def add_edge(self, node_id1, node_id2, constraint):
-        """Add an edge between two nodes"""
-        if node_id1 < len(self.nodes) and node_id2 < len(self.nodes):
-            self.edges.append((node_id1, node_id2, constraint))
-            return len(self.edges) - 1  # Return edge ID
-        return -1
-
-    def get_node_count(self):
-        return len([node for node in self.nodes if node is not None])
-
-    def get_edge_count(self):
-        return len(self.edges)
-
-    def get_nodes(self):
-        return self.nodes
-
-    def get_edges(self):
-        return self.edges
-
-    def remove_node(self, node_id):
-        """Remove a node and all edges connected to it"""
-        if 0 <= node_id < len(self.nodes):
-            # Remove all edges that connect to this node
-            self.edges = [
-                (id1, id2, constraint)
-                for id1, id2, constraint in self.edges
-                if id1 != node_id and id2 != node_id
-            ]
-
-            # Mark the node as removed (we can't actually remove it due to ID mapping)
-            # Instead, we'll set it to None and handle this in get_node_count
-            self.nodes[node_id] = None
-            return True
-        return False
-
-    def clear(self):
-        """Clear all nodes and edges"""
-        self.nodes.clear()
-        self.edges.clear()
-        self.next_node_id = 0
-
-
 class GeometricConstraintSystem:
+    """Wrapper for the C++ ConstraintGraphHandle with Python-friendly interface"""
+
     def __init__(self, shape_data):
         self.shape_data_ref = shape_data
-        # Create a Python-based SimpleConstraintGraph
-        self.constraint_graph = SimpleConstraintGraph()
+
+        # Create a C++ ConstraintGraphHandle if bindings available
+        if BINDINGS_AVAILABLE and gcs_handle is not None:
+            self.graph_handle = gcs_handle.ConstraintGraphHandle()
+        else:
+            self.graph_handle = None
 
         # Map drawable shapes to constraint graph node IDs
         self.shape_to_node_id = {}
 
         # Track constraints between shapes
-        self.constraints = (
-            []
-        )  # List of (shape1, shape2, constraint_type, value) tuples
+        self.constraints = []  # List of (shape1, shape2, constraint_type, value) tuples
 
     def add_shape_as_node(self, shape: drawmodel.Drawable):
         """Add a drawable shape as a node in the constraint graph"""
+        if not BINDINGS_AVAILABLE or self.graph_handle is None:
+            print("✗ Cannot add shape: C++ bindings not available")
+            return None
+
         try:
-            # Convert drawable shape to SimpleElement
+            # Convert drawable shape to graph node using handle API
             if isinstance(shape, drawmodel.Point):
-                element = SimpleElement.create_point(
+                node_id = self.graph_handle.addPoint(
                     shape.coords.x, shape.coords.y
                 )
             elif isinstance(shape, drawmodel.Circle):
-                element = SimpleElement.create_circle(
+                node_id = self.graph_handle.addCircle(
                     shape.center.x, shape.center.y, shape.radius
                 )
             elif isinstance(shape, drawmodel.Line):
@@ -146,20 +61,19 @@ class GeometricConstraintSystem:
                 r0_y = shape.defining_point_one.coords.y
                 v_x = shape.defining_point_two.coords.x - r0_x
                 v_y = shape.defining_point_two.coords.y - r0_y
-                element = SimpleElement.create_line(r0_x, r0_y, v_x, v_y)
+                node_id = self.graph_handle.addLine(r0_x, r0_y, v_x, v_y)
             else:
                 print(f"Warning: Unknown shape type {type(shape)}")
                 return None
 
-            # Add node to constraint graph
-            node_id = self.constraint_graph.add_node(element)
             self.shape_to_node_id[shape] = node_id
-
             print(f"Added shape {type(shape).__name__} as node {node_id}")
             return node_id
 
         except Exception as e:
             print(f"Error adding shape as node: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def add_constraint_between_shapes(
@@ -170,6 +84,10 @@ class GeometricConstraintSystem:
         value: float,
     ):
         """Add a constraint between two shapes"""
+        if not BINDINGS_AVAILABLE or self.graph_handle is None:
+            print("✗ Cannot add constraint: C++ bindings not available")
+            return False
+
         # Ensure both shapes are in the constraint graph
         node1_id = self.shape_to_node_id.get(shape1)
         node2_id = self.shape_to_node_id.get(shape2)
@@ -184,57 +102,42 @@ class GeometricConstraintSystem:
             return False
 
         try:
-            # Create constraint
+            # Add constraint using handle API
+            success = False
             if constraint_type.lower() == "distance":
-                constraint = SimpleConstraint.create_distance(value)
+                success = self.graph_handle.addDistanceConstraint(
+                    node1_id, node2_id, value
+                )
             elif constraint_type.lower() == "tangency":
-                constraint = SimpleConstraint.create_tangency(value)
+                success = self.graph_handle.addTangencyConstraint(
+                    node1_id, node2_id, value
+                )
             else:
                 print(f"Unknown constraint type: {constraint_type}")
                 return False
 
-            # Add edge to constraint graph
-            edge_id = self.constraint_graph.add_edge(
-                node1_id, node2_id, constraint
-            )
+            if success:
+                # Track the constraint
+                self.constraints.append((shape1, shape2, constraint_type, value))
+                print(
+                    f"Added {constraint_type} constraint (value: {value}) between nodes {node1_id} and {node2_id}"
+                )
 
-            # Track the constraint
-            self.constraints.append((shape1, shape2, constraint_type, value))
-
-            print(
-                f"Added {constraint_type} constraint (value: {value}) between nodes {node1_id} and {node2_id}, edge ID: {edge_id}"
-            )
-            return True
+            return success
 
         except Exception as e:
             print(f"Error adding constraint: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
-    def get_constraint_graph_info(self):
-        """Get information about the current constraint graph"""
-        try:
-            node_count = self.constraint_graph.get_node_count()
-            edge_count = self.constraint_graph.get_edge_count()
+    def get_constraint_graph_info(self, include_decomposition=False):
+        """Get information about the current constraint graph
 
-            # For now, we don't do complex well-constrained analysis in Python
-            # This will be done when we convert to C++ for solving
-            well_constrained = False
-            subgraph_sizes = []
-
-            # Simple heuristic: 2D constraints generally need 2*n - 3 constraints for n points
-            # This is a rough approximation for display purposes
-            if node_count > 2:
-                expected_constraints = 2 * node_count - 3
-                well_constrained = edge_count >= expected_constraints
-
-            return {
-                "nodes": node_count,
-                "edges": edge_count,
-                "well_constrained": well_constrained,
-                "subgraph_sizes": [node_count] if node_count > 0 else [],
-            }
-        except Exception as e:
-            print(f"Error getting constraint graph info: {e}")
+        Args:
+            include_decomposition: If True, include expensive decomposition analysis
+        """
+        if not BINDINGS_AVAILABLE or self.graph_handle is None:
             return {
                 "nodes": 0,
                 "edges": 0,
@@ -242,48 +145,219 @@ class GeometricConstraintSystem:
                 "subgraph_sizes": [],
             }
 
-    def solve_constraint_system(self):
-        """Solve the constraint system and return updated positions"""
-        # For now, we just return the current positions without solving
-        # Real solving will be done when converted to C++
         try:
-            if self.constraint_graph.get_node_count() == 0:
-                return []
+            node_count = self.graph_handle.getNodeCount()
+            edge_count = self.graph_handle.getEdgeCount()
+            well_constrained = self.graph_handle.isWellConstrained()
 
-            print(
-                f"Mock solving constraint system with {self.constraint_graph.get_node_count()} nodes and {self.constraint_graph.get_edge_count()} edges"
-            )
-            print(
-                "Note: Real constraint solving will be implemented when converting to C++"
-            )
+            # Only compute decomposition if explicitly requested (it's expensive)
+            subgraph_sizes = []
+            if include_decomposition:
+                subgraph_sizes = self.graph_handle.getDecompositionInfo()
 
-            # Return mock solved positions (just current positions)
-            positions = []
-            for node in self.constraint_graph.get_nodes():
-                if node.type == "Point":
-                    positions.append([node.data[0], node.data[1]])
-                elif node.type == "Circle":
-                    positions.append(
-                        [node.data[0], node.data[1]]
-                    )  # Center position
-                elif node.type == "Line":
-                    positions.append(
-                        [node.data[0], node.data[1]]
-                    )  # Start position
+            return {
+                "nodes": node_count,
+                "edges": edge_count,
+                "well_constrained": well_constrained,
+                "subgraph_sizes": subgraph_sizes if subgraph_sizes else [node_count] if node_count > 0 else [],
+            }
+        except Exception as e:
+            print(f"Error getting constraint graph info: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "nodes": 0,
+                "edges": 0,
+                "well_constrained": False,
+                "subgraph_sizes": [],
+            }
 
-            return positions
+    def solve_constraint_graph(self):
+        """Solve the constraint graph and update shape positions"""
+        if not BINDINGS_AVAILABLE or self.graph_handle is None:
+            print("✗ C++ bindings not available for solving")
+            return False
+
+        try:
+            node_count = self.graph_handle.getNodeCount()
+            if node_count == 0:
+                print("✗ No nodes in graph to solve")
+                return False
+
+            print(f"Solving constraint system with {node_count} nodes and {self.graph_handle.getEdgeCount()} edges")
+
+            # Call the solver
+            solved_positions = self.graph_handle.solve()
+
+            print(f"✓ Solver returned {len(solved_positions)} positions")
+
+            if len(solved_positions) == 0:
+                print("✗ No positions returned from solver")
+                return False
+
+            # Create reverse mapping from node ID to shape
+            node_id_to_shape = {node_id: shape for shape, node_id in self.shape_to_node_id.items()}
+
+            # Calculate centroids of original and solved positions
+            original_centroid_x = 0.0
+            original_centroid_y = 0.0
+            solved_centroid_x = 0.0
+            solved_centroid_y = 0.0
+            point_count = 0
+
+            for node_pos in solved_positions:
+                node_id = node_pos.nodeId
+                if node_id not in node_id_to_shape:
+                    continue
+
+                shape = node_id_to_shape[node_id]
+                data = node_pos.data
+
+                # Get original position
+                if isinstance(shape, drawmodel.Point):
+                    original_centroid_x += shape.coords.x
+                    original_centroid_y += shape.coords.y
+                    if len(data) >= 2:
+                        solved_centroid_x += data[0]
+                        solved_centroid_y += data[1]
+                    point_count += 1
+
+                elif isinstance(shape, drawmodel.Circle):
+                    original_centroid_x += shape.center.x
+                    original_centroid_y += shape.center.y
+                    if len(data) >= 2:
+                        solved_centroid_x += data[0]
+                        solved_centroid_y += data[1]
+                    point_count += 1
+
+                elif isinstance(shape, drawmodel.Line):
+                    # Use line reference point for centroid calculation
+                    original_centroid_x += shape.defining_point_one.coords.x
+                    original_centroid_y += shape.defining_point_one.coords.y
+                    if len(data) >= 2:
+                        solved_centroid_x += data[0]
+                        solved_centroid_y += data[1]
+                    point_count += 1
+
+            if point_count > 0:
+                original_centroid_x /= point_count
+                original_centroid_y /= point_count
+                solved_centroid_x /= point_count
+                solved_centroid_y /= point_count
+
+                # Calculate translation to align solved centroid with original centroid
+                translate_x = original_centroid_x - solved_centroid_x
+                translate_y = original_centroid_y - solved_centroid_y
+
+                print(f"  Original centroid: ({original_centroid_x:.2f}, {original_centroid_y:.2f})")
+                print(f"  Solved centroid: ({solved_centroid_x:.2f}, {solved_centroid_y:.2f})")
+                print(f"  Translating coordinates by ({translate_x:.2f}, {translate_y:.2f}) to maintain original position")
+
+                # Apply translation to all solved positions
+                translated_positions = []
+                for node_pos in solved_positions:
+                    data = node_pos.data
+                    translated_data = data.copy()
+                    if len(translated_data) >= 2:
+                        translated_data[0] += translate_x
+                        translated_data[1] += translate_y
+                    translated_positions.append((node_pos.nodeId, translated_data))
+
+                # Replace solved_positions with translated version
+                solved_positions_dict = {node_id: data for node_id, data in translated_positions}
+            else:
+                # No translation needed, use original positions
+                solved_positions_dict = {node_pos.nodeId: node_pos.data for node_pos in solved_positions}
+
+            # Update shapes with solved (and translated) positions
+            for node_id, data in solved_positions_dict.items():
+                if node_id not in node_id_to_shape:
+                    print(f"⚠ Warning: Node {node_id} has no shape mapping")
+                    continue
+
+                shape = node_id_to_shape[node_id]
+
+                # Update shape based on type
+                # Note: ConstraintGraphHandle already returns coordinates in canvas space
+                if isinstance(shape, drawmodel.Point):
+                    if len(data) >= 2:
+                        shape.coords.x = data[0]
+                        shape.coords.y = data[1]
+                        print(f"  Updated Point (node {node_id}) to ({data[0]:.2f}, {data[1]:.2f})")
+
+                elif isinstance(shape, drawmodel.Circle):
+                    if len(data) >= 3:
+                        shape.center.x = data[0]
+                        shape.center.y = data[1]
+                        shape.radius = data[2]
+                        print(f"  Updated Circle (node {node_id}) center to ({data[0]:.2f}, {data[1]:.2f}), radius {data[2]:.2f}")
+
+                elif isinstance(shape, drawmodel.Line):
+                    if len(data) >= 4:
+                        # Data: [r0_x, r0_y, v_x, v_y]
+                        shape.defining_point_one.coords.x = data[0]
+                        shape.defining_point_one.coords.y = data[1]
+                        shape.defining_point_two.coords.x = data[0] + data[2]
+                        shape.defining_point_two.coords.y = data[1] + data[3]
+                        print(f"  Updated Line (node {node_id})")
+
+            print("✓ Successfully updated all shape positions")
+            return True
 
         except Exception as e:
-            print(f"Error in mock solving constraint system: {e}")
-            return None
+            print(f"✗ Error during solving: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def get_graph_nodes(self):
+        """Get all nodes in the constraint graph for visualization"""
+        if not BINDINGS_AVAILABLE or self.graph_handle is None:
+            return []
+
+        try:
+            return self.graph_handle.getNodes()
+        except Exception as e:
+            print(f"Error getting graph nodes: {e}")
+            return []
+
+    def get_graph_edges(self):
+        """Get all edges in the constraint graph for visualization"""
+        if not BINDINGS_AVAILABLE or self.graph_handle is None:
+            return []
+
+        try:
+            return self.graph_handle.getEdges()
+        except Exception as e:
+            print(f"Error getting graph edges: {e}")
+            return []
+
+    def get_decomposed_subgraphs(self):
+        """Get decomposed subgraphs for visualization
+
+        Returns:
+            List of SubgraphInfo objects, each containing nodes and edges
+        """
+        if not BINDINGS_AVAILABLE or self.graph_handle is None:
+            return []
+
+        try:
+            return self.graph_handle.getDecomposedSubgraphs()
+        except Exception as e:
+            print(f"Error getting decomposed subgraphs: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
 
     def remove_shape(self, shape: drawmodel.Drawable):
         """Remove a shape from the constraint graph"""
+        # Note: Current ConstraintGraphHandle doesn't support node removal
+        # This would require rebuilding the graph
+        print("⚠ Warning: Shape removal not implemented in ConstraintGraphHandle")
+        print("  Consider rebuilding the graph if needed")
+
         node_id = self.shape_to_node_id.get(shape)
         if node_id is not None:
-            # Remove the node and its edges from the constraint graph
-            self.constraint_graph.remove_node(node_id)
-
             # Remove from shape mapping
             del self.shape_to_node_id[shape]
 
@@ -294,208 +368,30 @@ class GeometricConstraintSystem:
                 if s1 != shape and s2 != shape
             ]
 
-            print(
-                f"Removed shape {type(shape).__name__} (node {node_id}) from constraint graph"
-            )
+            print(f"Removed shape {type(shape).__name__} (node {node_id}) from tracking")
             return True
         return False
 
     def clear_constraint_graph(self):
         """Clear the entire constraint graph"""
-        self.constraint_graph.clear()
+        if BINDINGS_AVAILABLE and self.graph_handle is not None:
+            self.graph_handle.clear()
+
         self.shape_to_node_id.clear()
         self.constraints.clear()
         print("Cleared entire constraint graph")
 
-    def convert_to_cpp_graph(self):
-        """Convert Python SimpleConstraintGraph to C++ SimpleConstraintGraph"""
-        if not BINDINGS_AVAILABLE or scg is None:
-            print("✗ C++ bindings not available for conversion")
-            return None
+    def cleanup(self):
+        """Cleanup resources to prevent memory leaks"""
+        if BINDINGS_AVAILABLE and self.graph_handle is not None:
+            self.graph_handle.clear()
+            # Explicitly delete the handle to help with cleanup
+            del self.graph_handle
+            self.graph_handle = None
 
-        try:
-            # Create a C++ SimpleConstraintGraph
-            cpp_graph = scg.SimpleConstraintGraph()
-
-            # Convert nodes
-            node_mapping = {}  # Map Python node IDs to C++ node IDs
-            for i, py_node in enumerate(self.constraint_graph.get_nodes()):
-                if py_node is None:
-                    continue
-
-                # Create C++ element based on type
-                if py_node.type == "Point":
-                    cpp_element = scg.SimpleElement.createPoint(
-                        py_node.data[0], py_node.data[1]
-                    )
-                elif py_node.type == "Circle":
-                    cpp_element = scg.SimpleElement.createCircle(
-                        py_node.data[0], py_node.data[1], py_node.data[2]
-                    )
-                elif py_node.type == "Line":
-                    cpp_element = scg.SimpleElement.createLine(
-                        py_node.data[0], py_node.data[1],
-                        py_node.data[2], py_node.data[3]
-                    )
-                else:
-                    continue
-
-                cpp_node_id = cpp_graph.addNode(cpp_element)
-                node_mapping[i] = cpp_node_id
-
-            # Convert edges
-            for node_id1, node_id2, py_constraint in self.constraint_graph.get_edges():
-                if node_id1 not in node_mapping or node_id2 not in node_mapping:
-                    continue
-
-                # Create C++ constraint based on type
-                if py_constraint.type == "Distance":
-                    cpp_constraint = scg.SimpleConstraint.createDistance(
-                        py_constraint.value
-                    )
-                elif py_constraint.type == "Tangency":
-                    cpp_constraint = scg.SimpleConstraint.createTangency(
-                        py_constraint.value
-                    )
-                else:
-                    continue
-
-                cpp_graph.addEdge(
-                    node_mapping[node_id1],
-                    node_mapping[node_id2],
-                    cpp_constraint
-                )
-
-            print(f"✓ Converted Python graph to C++ graph: {cpp_graph.getNodeCount()} nodes, {cpp_graph.getEdgeCount()} edges")
-            return cpp_graph
-
-        except Exception as e:
-            print(f"✗ Error converting Python graph to C++ graph: {e}")
-            return None
-
-    def decompose_constraint_graph(self):
-        """Decompose the constraint graph using C++ binding and return subgraphs"""
-        if not BINDINGS_AVAILABLE or scg is None:
-            print("✗ C++ bindings not available for decomposition")
-            return []
-
-        try:
-            # Convert Python graph to C++ graph
-            cpp_graph = self.convert_to_cpp_graph()
-            if cpp_graph is None:
-                return []
-
-            # Call C++ decomposition function
-            print("Calling C++ decomposeConstraintGraph...")
-            cpp_subgraphs = scg.decomposeConstraintGraph(cpp_graph)
-
-            print(f"✓ Decomposed into {len(cpp_subgraphs)} subgraphs")
-
-            # Convert C++ subgraphs back to Python representation
-            python_subgraphs = []
-            for i, cpp_subgraph in enumerate(cpp_subgraphs):
-                py_subgraph = SimpleConstraintGraph()
-
-                # Convert nodes
-                cpp_nodes = cpp_subgraph.getNodes()
-                for cpp_node in cpp_nodes:
-                    py_node = SimpleElement(cpp_node.type.name, list(cpp_node.data))
-                    py_subgraph.add_node(py_node)
-
-                # Convert edges
-                cpp_edges = cpp_subgraph.getEdges()
-                for cpp_edge in cpp_edges:
-                    py_constraint = SimpleConstraint(
-                        cpp_edge.constraint.type.name,
-                        cpp_edge.constraint.value
-                    )
-                    py_subgraph.add_edge(
-                        cpp_edge.nodeId1,
-                        cpp_edge.nodeId2,
-                        py_constraint
-                    )
-
-                python_subgraphs.append(py_subgraph)
-                print(f"  Subgraph {i}: {py_subgraph.get_node_count()} nodes, {py_subgraph.get_edge_count()} edges")
-
-            return python_subgraphs
-
-        except Exception as e:
-            print(f"✗ Error during decomposition: {e}")
-            import traceback
-            traceback.print_exc()
-            return []
-
-    def solve_constraint_graph(self, canvas_center_x=None, canvas_center_y=None):
-        """Solve the constraint graph and update shape positions
-
-        Args:
-            canvas_center_x: X coordinate of canvas center (for translating solved positions)
-            canvas_center_y: Y coordinate of canvas center (for translating solved positions)
-        """
-        if not BINDINGS_AVAILABLE or scg is None:
-            print("✗ C++ bindings not available for solving")
-            return False
-
-        try:
-            # Convert Python graph to C++ graph
-            cpp_graph = self.convert_to_cpp_graph()
-            if cpp_graph is None:
-                print("✗ Failed to convert graph")
-                return False
-
-            # Call C++ solver function
-            print("Calling C++ solveSimpleConstraintGraph...")
-            solved_positions = scg.solveSimpleConstraintGraph(cpp_graph)
-
-            print(f"✓ Solver returned {len(solved_positions)} positions")
-
-            # Calculate translation offset
-            # Solver starts from (0,0), we want to move it to canvas center
-            offset_x = canvas_center_x if canvas_center_x is not None else 0
-            offset_y = canvas_center_y if canvas_center_y is not None else 0
-
-            print(f"Translating solved positions by offset ({offset_x:.2f}, {offset_y:.2f})")
-
-            # Update the shapes with solved positions (translated to canvas center)
-            node_id_to_shape = {node_id: shape for shape, node_id in self.shape_to_node_id.items()}
-
-            for node_id, position in enumerate(solved_positions):
-                if node_id in node_id_to_shape:
-                    shape = node_id_to_shape[node_id]
-
-                    # Update shape based on type
-                    if isinstance(shape, drawmodel.Point):
-                        if len(position) >= 2:
-                            shape.coords.x = position[0] + offset_x
-                            shape.coords.y = position[1] + offset_y
-                            print(f"  Updated Point (node {node_id}) to ({shape.coords.x:.2f}, {shape.coords.y:.2f})")
-
-                    elif isinstance(shape, drawmodel.Circle):
-                        if len(position) >= 2:
-                            shape.center.x = position[0] + offset_x
-                            shape.center.y = position[1] + offset_y
-                            print(f"  Updated Circle (node {node_id}) center to ({shape.center.x:.2f}, {shape.center.y:.2f})")
-
-                    elif isinstance(shape, drawmodel.Line):
-                        if len(position) >= 4:
-                            # Update both defining points of the line
-                            # Line is defined by two points, but solver returns r0 and direction vector
-                            # We need to update the point positions
-                            shape.defining_point_one.coords.x = position[0] + offset_x
-                            shape.defining_point_one.coords.y = position[1] + offset_y
-                            shape.defining_point_two.coords.x = position[0] + position[2] + offset_x
-                            shape.defining_point_two.coords.y = position[1] + position[3] + offset_y
-                            print(f"  Updated Line (node {node_id})")
-
-            print("✓ Successfully updated all shape positions")
-            return True
-
-        except Exception as e:
-            print(f"✗ Error during solving: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+        self.shape_to_node_id.clear()
+        self.constraints.clear()
+        self.shape_data_ref = None
 
     def save_to_file(self, filename: str):
         """Save the current drawing and constraints to a JSON file"""

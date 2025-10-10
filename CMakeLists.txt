@@ -43,7 +43,7 @@ FetchContent_MakeAvailable(autodiff)
 
 ######################## Optionally setting up nanobind for python binding generation ########################
 
-option(GENERATE_PYTHON_BINDINGS "Enable nanobind python bindings generation" OFF)
+option(GENERATE_PYTHON_BINDINGS "Enable nanobind python bindings generation" ON)
 
 if(GENERATE_PYTHON_BINDINGS)
     if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -59,27 +59,14 @@ if(GENERATE_PYTHON_BINDINGS)
     message(STATUS "The nanobind root is ${nanobind_ROOT}")
     find_package(nanobind CONFIG REQUIRED)
 
-    nanobind_add_module(equation_system_solver_binding NOMINSIZE
-                        src/python_bindings/equation_system_solver_binding.cpp
-                        src/constraint_solver/constraint_equation_solver.cpp)
-    target_include_directories(equation_system_solver_binding PRIVATE
-                src/common
-                ${spdlog_INCLUDE_DIRS}
-                ${autodiff_INCLUDE_DIRS}
-                ${Eigen3_INCLUDE_DIRS})
-
-    target_compile_definitions(equation_system_solver_binding PRIVATE SPDLOG_USE_STD_FORMAT)
-    target_link_libraries(equation_system_solver_binding PRIVATE spdlog::spdlog autodiff::autodiff Eigen3::Eigen)
-
-    # Simple Constraint Graph binding (replacement for the faulty constraint_graph_binding)
-    nanobind_add_module(simple_constraint_graph_binding NOMINSIZE
-                        src/python_bindings/simple_constraint_graph_binding.cpp
-                        src/python_bindings/simple_constraint_graph.cpp
-                        src/python_bindings/constraint_graph_converter.cpp
+    # Constraint Graph Handle binding (opaque handle pattern for simplified API)
+    nanobind_add_module(constraint_graph_handle_binding NOMINSIZE
+                        src/python_bindings/constraint_graph_handle_binding.cpp
+                        src/python_bindings/constraint_graph_handle.cpp
                         src/constraint_solver/geometric_constraint_system.cpp
                         src/constraint_solver/constraint_equation_solver.cpp
                         src/common/common/common_uuid.cpp)
-    target_include_directories(simple_constraint_graph_binding PRIVATE
+    target_include_directories(constraint_graph_handle_binding PRIVATE
                 src/common
                 src/utils
                 ${spdlog_INCLUDE_DIRS}
@@ -88,8 +75,8 @@ if(GENERATE_PYTHON_BINDINGS)
                 ${autodiff_INCLUDE_DIRS}
                 ${Eigen3_INCLUDE_DIRS})
 
-    target_compile_definitions(simple_constraint_graph_binding PRIVATE SPDLOG_USE_STD_FORMAT LIBUUID_CPP20_OR_GREATER)
-    target_link_libraries(simple_constraint_graph_binding PRIVATE spdlog::spdlog ogdf::ogdf stduuid::stduuid autodiff::autodiff Eigen3::Eigen)
+    target_compile_definitions(constraint_graph_handle_binding PRIVATE SPDLOG_USE_STD_FORMAT LIBUUID_CPP20_OR_GREATER)
+    target_link_libraries(constraint_graph_handle_binding PRIVATE spdlog::spdlog ogdf::ogdf stduuid::stduuid autodiff::autodiff Eigen3::Eigen)
 endif()
 
 ######################## Optionally setting up nanobind for python binding generation ########################
