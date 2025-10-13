@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import math
 
 # Add path to C++ bindings
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../../../build/Debug'))
@@ -55,13 +56,12 @@ class GeometricConstraintSystem:
                     shape.center.x, shape.center.y, shape.radius
                 )
             elif isinstance(shape, drawmodel.Line):
-                # For lines, we use the direction vector representation
-                # r0 = starting point, v = direction vector
-                r0_x = shape.defining_point_one.coords.x
-                r0_y = shape.defining_point_one.coords.y
-                v_x = shape.defining_point_two.coords.x - r0_x
-                v_y = shape.defining_point_two.coords.y - r0_y
-                node_id = self.graph_handle.addLine(r0_x, r0_y, v_x, v_y)
+                # For lines, we use two-point representation
+                x1 = shape.defining_point_one.coords.x
+                y1 = shape.defining_point_one.coords.y
+                x2 = shape.defining_point_two.coords.x
+                y2 = shape.defining_point_two.coords.y
+                node_id = self.graph_handle.addLine(x1, y1, x2, y2)
             else:
                 print(f"Warning: Unknown shape type {type(shape)}")
                 return None
@@ -111,6 +111,10 @@ class GeometricConstraintSystem:
             elif constraint_type.lower() == "tangency":
                 success = self.graph_handle.addTangencyConstraint(
                     node1_id, node2_id, value
+                )
+            elif constraint_type.lower() == "pointonline":
+                success = self.graph_handle.addPointOnLineConstraint(
+                    node1_id, node2_id
                 )
             else:
                 print(f"Unknown constraint type: {constraint_type}")
@@ -186,6 +190,9 @@ class GeometricConstraintSystem:
 
             print(f"Solving constraint system with {node_count} nodes and {self.graph_handle.getEdgeCount()} edges")
 
+            # Create reverse mapping from node_id to shape
+            node_id_to_shape = {node_id: shape for shape, node_id in self.shape_to_node_id.items()}
+
             # Call the solver
             solved_positions = self.graph_handle.solve()
 
@@ -195,8 +202,8 @@ class GeometricConstraintSystem:
                 print("✗ No positions returned from solver")
                 return False
 
-            # Create reverse mapping from node ID to shape
-            node_id_to_shape = {node_id: shape for shape, node_id in self.shape_to_node_id.items()}
+            # Create reverse mapping from node ID to shape (already created above)
+            # node_id_to_shape = {node_id: shape for shape, node_id in self.shape_to_node_id.items()}
 
             # Calculate centroids of original and solved positions
             original_centroid_x = 0.0
@@ -293,13 +300,57 @@ class GeometricConstraintSystem:
                         print(f"  Updated Circle (node {node_id}) center to ({data[0]:.2f}, {data[1]:.2f}), radius {data[2]:.2f}")
 
                 elif isinstance(shape, drawmodel.Line):
-                    if len(data) >= 4:
-                        # Data: [r0_x, r0_y, v_x, v_y]
-                        shape.defining_point_one.coords.x = data[0]
-                        shape.defining_point_one.coords.y = data[1]
-                        shape.defining_point_two.coords.x = data[0] + data[2]
-                        shape.defining_point_two.coords.y = data[1] + data[3]
-                        print(f"  Updated Line (node {node_id})")
+                    # Lines will be updated separately after all points are positioned
+                    print(f"  Skipping Line (node {node_id}) - will update after points")
+
+            # After all points are updated, update lines based on their constrained points
+            print("Updating lines based on constrained points...")
+            for node_id, shape in node_id_to_shape.items():
+                if isinstance(shape, drawmodel.Line):
+                    # Find all points constrained to this line via PointOnLine constraints
+                    constrained_points = []
+                    for constraint_tuple in self.constraints:
+                        shape1, shape2, constraint_type, value = constraint_tuple
+                        if constraint_type.lower() == "pointonline":
+                            # Check if this line is one of the constrained shapes
+                            if shape2 is shape and isinstance(shape1, drawmodel.Point):
+                                constrained_points.append(shape1)
+                            elif shape1 is shape and isinstance(shape2, drawmodel.Point):
+                                constrained_points.append(shape2)
+
+                    if len(constrained_points) >= 2:
+                        # Use the first two constrained points to define the line
+                        # These points have already been correctly positioned by the solver
+                        point1 = constrained_points[0]
+                        point2 = constrained_points[1]
+
+                        # Get the direction from these two points
+                        dx = point2.coords.x - point1.coords.x
+                        dy = point2.coords.y - point1.coords.y
+                        length = math.sqrt(dx * dx + dy * dy)
+
+                        if length > 1e-6:
+                            # Extend the line beyond the constrained points for visibility
+                            extension = 50.0  # Fixed extension in pixels
+                            dir_x = dx / length
+                            dir_y = dy / length
+
+                            # Extend from point1 backwards and from point2 forwards
+                            new_x1 = point1.coords.x - dir_x * extension
+                            new_y1 = point1.coords.y - dir_y * extension
+                            new_x2 = point2.coords.x + dir_x * extension
+                            new_y2 = point2.coords.y + dir_y * extension
+
+                            shape.defining_point_one.coords.x = new_x1
+                            shape.defining_point_one.coords.y = new_y1
+                            shape.defining_point_two.coords.x = new_x2
+                            shape.defining_point_two.coords.y = new_y2
+
+                            print(f"  Updated Line (node {node_id}) from constrained points, extended by {extension}px on each end")
+                        else:
+                            print(f"  ⚠ Warning: Line (node {node_id}) has degenerate constrained points (same position)")
+                    else:
+                        print(f"  ⚠ Warning: Line (node {node_id}) has less than 2 constrained points, cannot update")
 
             print("✓ Successfully updated all shape positions")
             return True

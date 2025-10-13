@@ -42,7 +42,10 @@ public:
 
     Common::Uuid getId() const { return id_; }
 
-    bool operator==(const OGDFNodeImpl& other) const { return id_ == other.id_; }
+    bool operator==(const OGDFNodeImpl& other) const
+    {
+        return id_ == other.id_;
+    }
 };
 
 class OGDFEdgeImpl {
@@ -61,7 +64,10 @@ public:
 
     bool isVirtual() const { return virtualEdge_; }
 
-    bool operator==(const OGDFEdgeImpl& other) const { return id_ == other.id_; }
+    bool operator==(const OGDFEdgeImpl& other) const
+    {
+        return id_ == other.id_;
+    }
 };
 
 template <typename NodeStoredObject, typename EdgeStoredObject>
@@ -90,7 +96,8 @@ private:
     std::unordered_map<Common::Uuid, EdgeConnection> edgeConnections_;
 
     // Adjacency list: node UUID -> set of edge UUIDs
-    std::unordered_map<Common::Uuid, std::unordered_set<Common::Uuid>> adjacency_;
+    std::unordered_map<Common::Uuid, std::unordered_set<Common::Uuid>>
+        adjacency_;
 
     // Temporary OGDF conversion structures
     struct OGDFConversion {
@@ -130,7 +137,7 @@ private:
     OGDFGraphImpl createSubgraph(
         const std::unordered_set<Common::Uuid>& nodeUuids,
         const std::vector<Common::Uuid>& separatorUuids,
-        bool markVirtualEdges) const
+        std::shared_ptr<EdgeStoredObject> virtualEdgeObj) const
     {
         OGDFGraphImpl subgraph;
 
@@ -146,20 +153,10 @@ private:
         for (const auto& [edgeUuid, edge] : edges_) {
             const auto& conn = edgeConnections_.at(edgeUuid);
 
-            if (nodeUuids.contains(conn.source) && nodeUuids.contains(conn.target)) {
-                bool isVirtual = false;
-
-                // Check if this edge is between separator nodes
-                if (separatorUuids.size() == 2 && markVirtualEdges) {
-                    if ((conn.source == separatorUuids[0] && conn.target == separatorUuids[1]) ||
-                        (conn.source == separatorUuids[1] && conn.target == separatorUuids[0])) {
-                        isVirtual = true;
-                    }
-                }
-
-                // Create new edge with potentially updated virtual flag
-                EdgeType newEdge(OGDFEdgeImpl(isVirtual), edge.getStoredObj());
-                subgraph.edges_[edgeUuid] = newEdge;
+            if (nodeUuids.contains(conn.source)
+                && nodeUuids.contains(conn.target)) {
+                // Copy edge as-is (preserve original virtual flag)
+                subgraph.edges_[edgeUuid] = edge;
                 subgraph.edgeConnections_[edgeUuid] = conn;
 
                 // Update adjacency
@@ -168,11 +165,44 @@ private:
             }
         }
 
+        // Add virtual edge between separators if none exists and virtual edge
+        // object provided
+        if (separatorUuids.size() == 2 && virtualEdgeObj != nullptr) {
+            Common::Uuid sep1 = separatorUuids[0];
+            Common::Uuid sep2 = separatorUuids[1];
+
+            // Check if there's already an edge between the separators
+            bool edgeExists = false;
+            auto adjIt = subgraph.adjacency_.find(sep1);
+            if (adjIt != subgraph.adjacency_.end()) {
+                for (const auto& edgeUuid : adjIt->second) {
+                    const auto& conn = subgraph.edgeConnections_.at(edgeUuid);
+                    if ((conn.source == sep1 && conn.target == sep2)
+                        || (conn.source == sep2 && conn.target == sep1)) {
+                        edgeExists = true;
+                        break;
+                    }
+                }
+            }
+
+            // Create virtual edge if no edge exists
+            if (!edgeExists) {
+                EdgeType virtualEdge(OGDFEdgeImpl(true), virtualEdgeObj);
+                Common::Uuid edgeId = virtualEdge.getId();
+
+                subgraph.edges_[edgeId] = virtualEdge;
+                subgraph.edgeConnections_[edgeId] = { sep1, sep2 };
+
+                // Update adjacency lists
+                subgraph.adjacency_[sep1].insert(edgeId);
+                subgraph.adjacency_[sep2].insert(edgeId);
+            }
+        }
+
         return subgraph;
     }
 
 public:
-
     NodeType& addNode(std::shared_ptr<NodeStoredObject> obj)
     {
         NodeType newNode(OGDFNodeImpl(), obj);
@@ -256,9 +286,11 @@ public:
     }
 
     std::vector<OGDFGraphImpl> separateByVerticesByDuplication(
-        const std::vector<NodeType>& separatorNodes)
+        const std::vector<NodeType>& separatorNodes,
+        std::shared_ptr<EdgeStoredObject> virtualEdgeObj = nullptr)
     {
         std::vector<OGDFGraphImpl> subGraphs;
+        std::vector<std::unordered_set<Common::Uuid>> componentNodeSets;
 
         // Convert separator nodes to UUIDs
         std::vector<Common::Uuid> separatorUuids;
@@ -273,7 +305,8 @@ public:
 
         size_t totalNodes = nodes_.size();
 
-        // Find connected components (excluding separators from traversal boundaries)
+        // Find connected components (excluding separators from traversal
+        // boundaries)
         while (absoluteVisited.size() < totalNodes) {
             // Find an unvisited node to start DFS
             Common::Uuid startNode;
@@ -299,7 +332,8 @@ public:
                 Common::Uuid currentUuid = nodeStack.top();
                 nodeStack.pop();
 
-                if (componentNodes.contains(currentUuid) || absoluteVisited.contains(currentUuid)) {
+                if (componentNodes.contains(currentUuid)
+                    || absoluteVisited.contains(currentUuid)) {
                     continue;
                 }
 
@@ -313,20 +347,36 @@ public:
                         const auto& conn = edgeConnections_.at(edgeUuid);
 
                         // Find the neighbor node
-                        Common::Uuid neighborUuid = (conn.source == currentUuid) ? conn.target : conn.source;
+                        Common::Uuid neighborUuid = (conn.source == currentUuid)
+                            ? conn.target
+                            : conn.source;
 
                         // Add to stack if not visited and not a separator
-                        if (!absoluteVisited.contains(neighborUuid) && !componentNodes.contains(neighborUuid)) {
+                        if (!absoluteVisited.contains(neighborUuid)
+                            && !componentNodes.contains(neighborUuid)) {
                             nodeStack.push(neighborUuid);
                         }
                     }
                 }
             }
 
-            // Create subgraph for this component
-            // Mark virtual edges starting from the second subgraph
-            bool markVirtual = !subGraphs.empty();
-            subGraphs.push_back(createSubgraph(componentNodes, separatorUuids, markVirtual));
+            componentNodeSets.push_back(componentNodes);
+        }
+
+        // Find the largest component size
+        size_t maxComponentSize = 0;
+        for (const auto& componentNodes : componentNodeSets) {
+            if (componentNodes.size() > maxComponentSize) {
+                maxComponentSize = componentNodes.size();
+            }
+        }
+
+        // Create subgraphs, adding virtual edges only to smaller components
+        for (const auto& componentNodes : componentNodeSets) {
+            bool isLargestComponent = (componentNodes.size() == maxComponentSize);
+            auto virtualEdge = isLargestComponent ? nullptr : virtualEdgeObj;
+            subGraphs.push_back(
+                createSubgraph(componentNodes, separatorUuids, virtualEdge));
         }
 
         return subGraphs;
@@ -379,13 +429,19 @@ public:
         for (const auto& edgeUuid : adjIt->second) {
             const auto& conn = edgeConnections_.at(edgeUuid);
 
-            if ((conn.source == uuid1 && conn.target == uuid2) ||
-                (conn.source == uuid2 && conn.target == uuid1)) {
+            if ((conn.source == uuid1 && conn.target == uuid2)
+                || (conn.source == uuid2 && conn.target == uuid1)) {
                 return edges_.at(edgeUuid);
             }
         }
 
         return std::nullopt;
+    }
+
+    bool hasVirtualEdge() const
+    {
+        return std::ranges::any_of(
+            edges_, [](const auto& pair) { return pair.second.isVirtual(); });
     }
 };
 

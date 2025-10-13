@@ -140,6 +140,8 @@ class ConstraintGraphWidget(Gtk.Box):
             vertex_color = combined_graph.new_vertex_property("vector<double>")
             vertex_size = combined_graph.new_vertex_property("double")
             edge_text = combined_graph.new_edge_property("string")
+            edge_dash_style = combined_graph.new_edge_property("vector<double>")
+            edge_color = combined_graph.new_edge_property("vector<double>")
 
             # Different colors for each subgraph
             subgraph_colors = [
@@ -176,7 +178,16 @@ class ConstraintGraphWidget(Gtk.Box):
                         v1 = local_node_to_vertex[edge.nodeId1]
                         v2 = local_node_to_vertex[edge.nodeId2]
                         e = combined_graph.add_edge(v1, v2)
-                        edge_text[e] = f"{edge.type}: {edge.value:.1f}"
+
+                        # Check if edge is virtual
+                        if edge.isVirtual:
+                            edge_text[e] = f"{edge.type}: {edge.value:.1f} (VIRTUAL)"
+                            edge_dash_style[e] = [0.02, 0.02]  # Dotted line
+                            edge_color[e] = [1.0, 0.0, 0.0, 1.0]  # Red for virtual edges
+                        else:
+                            edge_text[e] = f"{edge.type}: {edge.value:.1f}"
+                            edge_dash_style[e] = []  # Solid line
+                            edge_color[e] = [0.0, 0.0, 0.0, 1.0]  # Black for normal edges
 
             # Create layout
             if combined_graph.num_vertices() > 0:
@@ -202,6 +213,8 @@ class ConstraintGraphWidget(Gtk.Box):
                     vertex_fill_color=vertex_color,
                     vertex_size=vertex_size,
                     edge_text=edge_text,
+                    edge_dash_style=edge_dash_style,
+                    edge_color=edge_color,
                     vertex_font_size=15,
                     edge_font_size=12,
                 )

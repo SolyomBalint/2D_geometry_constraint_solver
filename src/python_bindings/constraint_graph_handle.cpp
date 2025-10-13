@@ -7,9 +7,7 @@ namespace GcsBinding {
 namespace {
     // Helper function to extract element info (type and data)
     void extractElementInfo(const std::shared_ptr<Gcs::Element>& element,
-                           std::string& type,
-                           std::vector<double>& data,
-                           bool flipY)
+        std::string& type, std::vector<double>& data, bool flipY)
     {
         element->visitElement([&type, &data, flipY](const auto& e) {
             using T = std::decay_t<decltype(e)>;
@@ -24,17 +22,17 @@ namespace {
                 data = { e.x, y, e.fixed_radius };
             } else if constexpr (std::is_same_v<T, Gcs::Line>) {
                 type = "Line";
-                double r0_y = flipY ? -e.r0_y : e.r0_y;
-                double v_y = flipY ? -e.v_y : e.v_y;
-                data = { e.r0_x, r0_y, e.v_x, v_y };
+                double y1 = flipY ? -e.y1 : e.y1;
+                double y2 = flipY ? -e.y2 : e.y2;
+                data = { e.x1, y1, e.x2, y2 };
             }
         });
     }
 
     // Helper function to extract constraint info (type and value)
-    void extractConstraintInfo(const std::shared_ptr<Gcs::Constraint>& constraint,
-                              std::string& type,
-                              double& value)
+    void extractConstraintInfo(
+        const std::shared_ptr<Gcs::Constraint>& constraint, std::string& type,
+        double& value)
     {
         constraint->visitConsraint([&type, &value](const auto& c) {
             using T = std::decay_t<decltype(c)>;
@@ -45,6 +43,9 @@ namespace {
             } else if constexpr (std::is_same_v<T, Gcs::TangencyConstraint>) {
                 type = "Tangency";
                 value = c.angle;
+            } else if constexpr (std::is_same_v<T, Gcs::PointOnLineConstraint>) {
+                type = "PointOnLine";
+                value = 0.0; // No value for point-on-line constraint
             }
         });
     }
@@ -63,7 +64,8 @@ int ConstraintGraphHandle::addPoint(double canvasX, double canvasY)
     return nodeId;
 }
 
-int ConstraintGraphHandle::addCircle(double canvasX, double canvasY, double radius)
+int ConstraintGraphHandle::addCircle(
+    double canvasX, double canvasY, double radius)
 {
     // Create FixedRadiusCircle, flip Y for solver space
     auto circle = std::make_shared<Gcs::Element>(
@@ -76,11 +78,11 @@ int ConstraintGraphHandle::addCircle(double canvasX, double canvasY, double radi
     return nodeId;
 }
 
-int ConstraintGraphHandle::addLine(double r0X, double r0Y, double vX, double vY)
+int ConstraintGraphHandle::addLine(double x1, double y1, double x2, double y2)
 {
-    // Create Line with flipped Y coordinates for solver space
+    // Create Line with two points, flip Y coordinates for solver space
     auto line = std::make_shared<Gcs::Element>(
-        Gcs::Line(r0X, flipYForSolver(r0Y), vX, flipYForSolver(vY)));
+        Gcs::Line(x1, flipYForSolver(y1), x2, flipYForSolver(y2)));
 
     auto& node = graph_.addNode(line);
     int nodeId = nextNodeId_++;
@@ -89,7 +91,8 @@ int ConstraintGraphHandle::addLine(double r0X, double r0Y, double vX, double vY)
     return nodeId;
 }
 
-bool ConstraintGraphHandle::addDistanceConstraint(int nodeId1, int nodeId2, double distance)
+bool ConstraintGraphHandle::addDistanceConstraint(
+    int nodeId1, int nodeId2, double distance)
 {
     auto it1 = nodeIdMap_.find(nodeId1);
     auto it2 = nodeIdMap_.find(nodeId2);
@@ -98,14 +101,15 @@ bool ConstraintGraphHandle::addDistanceConstraint(int nodeId1, int nodeId2, doub
         return false;
     }
 
-    auto constraint = std::make_shared<Gcs::Constraint>(
-        Gcs::DistanceConstraint(distance));
+    auto constraint
+        = std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(distance));
 
     graph_.addEdge(*it1->second, *it2->second, constraint);
     return true;
 }
 
-bool ConstraintGraphHandle::addTangencyConstraint(int nodeId1, int nodeId2, double angle)
+bool ConstraintGraphHandle::addTangencyConstraint(
+    int nodeId1, int nodeId2, double angle)
 {
     auto it1 = nodeIdMap_.find(nodeId1);
     auto it2 = nodeIdMap_.find(nodeId2);
@@ -114,10 +118,27 @@ bool ConstraintGraphHandle::addTangencyConstraint(int nodeId1, int nodeId2, doub
         return false;
     }
 
-    auto constraint = std::make_shared<Gcs::Constraint>(
-        Gcs::TangencyConstraint(angle));
+    auto constraint
+        = std::make_shared<Gcs::Constraint>(Gcs::TangencyConstraint(angle));
 
     graph_.addEdge(*it1->second, *it2->second, constraint);
+    return true;
+}
+
+bool ConstraintGraphHandle::addPointOnLineConstraint(
+    int pointNodeId, int lineNodeId)
+{
+    auto itPoint = nodeIdMap_.find(pointNodeId);
+    auto itLine = nodeIdMap_.find(lineNodeId);
+
+    if (itPoint == nodeIdMap_.end() || itLine == nodeIdMap_.end()) {
+        return false;
+    }
+
+    auto constraint
+        = std::make_shared<Gcs::Constraint>(Gcs::PointOnLineConstraint());
+
+    graph_.addEdge(*itPoint->second, *itLine->second, constraint);
     return true;
 }
 
@@ -134,7 +155,8 @@ std::vector<NodePosition> ConstraintGraphHandle::solve()
         auto element = nodePtr->getStoredObj();
         std::string type;
         std::vector<double> data;
-        extractElementInfo(element, type, data, true);  // true = flip Y for canvas
+        extractElementInfo(
+            element, type, data, true); // true = flip Y for canvas
         positions.emplace_back(nodeId, data);
     }
 
@@ -170,7 +192,8 @@ std::vector<int> ConstraintGraphHandle::getDecompositionInfo()
 
         return sizes;
     } catch (const std::exception& e) {
-        // If decomposition fails (e.g., graph not biconnected), return empty vector
+        // If decomposition fails (e.g., graph not biconnected), return empty
+        // vector
         return {};
     }
 }
@@ -208,7 +231,8 @@ std::vector<NodeInfo> ConstraintGraphHandle::getNodes() const
         auto element = nodePtr->getStoredObj();
         std::string type;
         std::vector<double> data;
-        extractElementInfo(element, type, data, true);  // true = flip Y for canvas
+        extractElementInfo(
+            element, type, data, true); // true = flip Y for canvas
         nodes.emplace_back(nodeId, type, data);
     }
 
@@ -219,8 +243,10 @@ std::vector<EdgeInfo> ConstraintGraphHandle::getEdges() const
 {
     std::vector<EdgeInfo> edges;
 
-    // Need to check all pairs since Edge interface doesn't expose connected nodes
-    std::vector<std::pair<int, Gcs::ConstraintGraph::NodeType*>> nodeList(nodeIdMap_.begin(), nodeIdMap_.end());
+    // Need to check all pairs since Edge interface doesn't expose connected
+    // nodes
+    std::vector<std::pair<int, Gcs::ConstraintGraph::NodeType*>> nodeList(
+        nodeIdMap_.begin(), nodeIdMap_.end());
 
     for (size_t i = 0; i < nodeList.size(); ++i) {
         for (size_t j = i + 1; j < nodeList.size(); ++j) {
@@ -235,7 +261,8 @@ std::vector<EdgeInfo> ConstraintGraphHandle::getEdges() const
                 std::string type;
                 double value = 0.0;
                 extractConstraintInfo(constraint, type, value);
-                edges.emplace_back(nodeId1, nodeId2, type, value);
+                bool isVirtual = edgeOpt->isVirtual();
+                edges.emplace_back(nodeId1, nodeId2, type, value, isVirtual);
             }
         }
     }
@@ -257,8 +284,10 @@ std::vector<SubgraphInfo> ConstraintGraphHandle::getDecomposedSubgraphs()
             std::vector<NodeInfo> subgraphNodes;
             std::vector<EdgeInfo> subgraphEdges;
 
-            // Map from subgraph node pointers to sequential IDs for this subgraph
-            std::unordered_map<const Gcs::ConstraintGraph::NodeType*, int> localNodeIdMap;
+            // Map from subgraph node pointers to sequential IDs for this
+            // subgraph
+            std::unordered_map<const Gcs::ConstraintGraph::NodeType*, int>
+                localNodeIdMap;
             int localNodeId = 0;
 
             // Get all nodes from this subgraph
@@ -269,7 +298,8 @@ std::vector<SubgraphInfo> ConstraintGraphHandle::getDecomposedSubgraphs()
                 auto element = node.getStoredObj();
                 std::string type;
                 std::vector<double> data;
-                extractElementInfo(element, type, data, true);  // true = flip Y for canvas
+                extractElementInfo(
+                    element, type, data, true); // true = flip Y for canvas
                 subgraphNodes.emplace_back(localNodeId, type, data);
                 localNodeIdMap[&node] = localNodeId;
                 localNodeId++;
@@ -278,13 +308,15 @@ std::vector<SubgraphInfo> ConstraintGraphHandle::getDecomposedSubgraphs()
             // Get all edges from this subgraph by checking all node pairs
             for (size_t i = 0; i < nodes.size(); ++i) {
                 for (size_t j = i + 1; j < nodes.size(); ++j) {
-                    auto edgeOpt = subgraph.getEdgeBetweenNodes(nodes[i], nodes[j]);
+                    auto edgeOpt
+                        = subgraph.getEdgeBetweenNodes(nodes[i], nodes[j]);
                     if (edgeOpt.has_value()) {
                         // Map nodes to local IDs
                         auto it1 = localNodeIdMap.find(&nodes[i]);
                         auto it2 = localNodeIdMap.find(&nodes[j]);
 
-                        if (it1 != localNodeIdMap.end() && it2 != localNodeIdMap.end()) {
+                        if (it1 != localNodeIdMap.end()
+                            && it2 != localNodeIdMap.end()) {
                             int nodeId1 = it1->second;
                             int nodeId2 = it2->second;
 
@@ -292,7 +324,9 @@ std::vector<SubgraphInfo> ConstraintGraphHandle::getDecomposedSubgraphs()
                             std::string type;
                             double value = 0.0;
                             extractConstraintInfo(constraint, type, value);
-                            subgraphEdges.emplace_back(nodeId1, nodeId2, type, value);
+                            bool isVirtual = edgeOpt->isVirtual();
+                            subgraphEdges.emplace_back(
+                                nodeId1, nodeId2, type, value, isVirtual);
                         }
                     }
                 }
@@ -304,7 +338,8 @@ std::vector<SubgraphInfo> ConstraintGraphHandle::getDecomposedSubgraphs()
         return result;
 
     } catch (const std::exception& e) {
-        // If decomposition fails (e.g., graph not biconnected), return empty vector
+        // If decomposition fails (e.g., graph not biconnected), return empty
+        // vector
         return {};
     }
 }

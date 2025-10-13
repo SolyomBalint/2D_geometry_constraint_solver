@@ -19,7 +19,7 @@
 #include <vector>
 
 #include "./constraint_solver/geometric_constraint_system.hpp"
-#include "./constraint_solver/constraint_equation_solver.hpp"
+#include "./constraint_solver/json_constraint_graph_loader.hpp"
 
 namespace {
 // NOLINTNEXTLINE note this should be investigated
@@ -106,52 +106,11 @@ int main(int argc, char* argv[])
     std::cout << "===========================" << std::endl;
 
     // Create a fresh constraint graph for testing defaultDecompositorFunc
-    MathUtils::Graph<Gcs::Element, Gcs::Constraint> testGraph;
-    auto testNode0 = testGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 0, 0 }));
-    auto testNode1 = testGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 5, 0 }));
-    auto testNode2 = testGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 0, 5 }));
-    auto testNode3 = testGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 5, 5 }));
-    auto testNode4 = testGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 5, -5 }));
-    auto testNode5 = testGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { 0, -5 }));
-    auto testNode6 = testGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { -5, -5 }));
-    auto testNode7 = testGraph.addNode(
-        std::make_shared<Gcs::Element>(Gcs::Point { -5, 0 }));
-
-    double squareSide = 6;
-    auto testEdge0 = testGraph.addEdge(testNode0, testNode1,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
-    auto testEdge1 = testGraph.addEdge(testNode0, testNode2,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
-    auto testEdge2 = testGraph.addEdge(testNode0, testNode3,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
-    auto testEdge3 = testGraph.addEdge(testNode0, testNode4,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
-    auto testEdge4 = testGraph.addEdge(testNode0, testNode5,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
-    auto testEdge5 = testGraph.addEdge(testNode0, testNode6,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
-    auto testEdge6 = testGraph.addEdge(testNode0, testNode7,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
-
-    auto testEdge7 = testGraph.addEdge(testNode1, testNode2,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
-    auto testEdge8 = testGraph.addEdge(testNode2, testNode3,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
-    auto testEdge9 = testGraph.addEdge(testNode3, testNode4,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
-    auto testEdge10 = testGraph.addEdge(testNode4, testNode5,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
-    auto testEdge11 = testGraph.addEdge(testNode5, testNode6,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
-    auto testEdge12 = testGraph.addEdge(testNode6, testNode7,
-        std::make_shared<Gcs::Constraint>(Gcs::DistanceConstraint(squareSide)));
+    MathUtils::Graph<Gcs::Element, Gcs::Constraint> testGraph {
+        Gcs::loadConstraintGraphFromJson(
+            "/home/balintsolyom/personal/projects/hand_calculated_crank.json")
+            .value()
+    };
 
     Gcs::GeometricConstraintSystem gcs {};
     gcs.solveGcsViaPipeline(testGraph);

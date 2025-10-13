@@ -19,6 +19,9 @@ namespace {
     constexpr int point1Index = 0;
     constexpr int point2Index = 1;
     constexpr int point3Index = 2;
+    constexpr int needNodesToCalculate = 2;
+
+    //=================Point-Distance Functions=================
 
     int getNumberOfCalculatedNode(const ConstraintGraph& subGraph)
     {
@@ -37,14 +40,6 @@ namespace {
     void solveFromZeroCalculatedNodes(ConstraintGraph& subGraph)
     {
         auto nodes = subGraph.getNodes();
-
-        // for (const auto& node : nodes) {
-        //     getGcsLogger()->debug(node.getStoredObj()->toString());
-        // }
-        //
-        // for (const auto& edge : subGraph.getEdges()) {
-        //     getGcsLogger()->debug(edge.getStoredObj()->getConstraintValue());
-        // }
 
         auto node1 = nodes.at(point1Index);
         auto node2 = nodes.at(point2Index);
@@ -81,7 +76,6 @@ namespace {
 
     void solveFromTwoCalculatedNodes(ConstraintGraph& subGraph)
     {
-
         using Node = ConstraintGraph::NodeType;
         auto nodes = subGraph.getNodes();
 
@@ -100,15 +94,6 @@ namespace {
             throw std::runtime_error(
                 "Trying to solve triangle with more than two solved elements");
         }
-
-        // for (const auto& node : setElemnts) {
-        //     getGcsLogger()->debug(node.getStoredObj()->toString());
-        // }
-        //
-        // for (const auto& edge : subGraph.getEdges()) {
-        //     getGcsLogger()->debug(edge.getStoredObj()->getConstraintValue());
-        // }
-        // debug
 
         auto p1ToP3Distance
             = subGraph.getEdgeBetweenNodes(setElemnts.front(), notSetElement)
@@ -134,6 +119,162 @@ namespace {
         notSetElement.getStoredObj()->updateElementPosition(
             outPutCoords.x, outPutCoords.y);
     }
+
+    //=================Point-Distance Functions=================
+
+    //=================Points-On-Line Functions=================
+
+    void solveFromTwoCalculatedNodesOneLine(ConstraintGraph& subGraph)
+    {
+        using Node = ConstraintGraph::NodeType;
+        auto nodes = subGraph.getNodes();
+
+        std::vector<Node> setElemnts;
+
+        Node notSetElement;
+
+        for (const auto& node : nodes) {
+            if (node.getStoredObj()->isElementSet()) {
+                setElemnts.push_back(node);
+            } else {
+                notSetElement = node;
+            }
+        }
+        if (setElemnts.size() > 2) {
+            throw std::runtime_error(
+                "Trying to solve triangle with more than two solved elements");
+        }
+
+        if (!notSetElement.getStoredObj()->isElementType<Line>()) {
+            throw std::runtime_error(
+                "Trying to set node to line while it is not a line");
+        }
+
+        const auto& p1 = setElemnts.front().getStoredObj()->getElement<Point>();
+        const auto& p2 = setElemnts.back().getStoredObj()->getElement<Point>();
+        notSetElement.getStoredObj()->updateElementPosition(
+            p1.x, p1.y, p2.x, p2.y);
+    }
+
+    void solveFromOneCalculatedNodesOneLine(ConstraintGraph& subGraph)
+    {
+        using Node = ConstraintGraph::NodeType;
+        auto nodes = subGraph.getNodes();
+
+        std::vector<Node> setElemnts;
+
+        Node notSetElement;
+
+        for (const auto& node : nodes) {
+            if (node.getStoredObj()->isElementSet()) {
+                setElemnts.push_back(node);
+            } else {
+                notSetElement = node;
+            }
+        }
+        if (setElemnts.size() > 2) {
+            throw std::runtime_error(
+                "Trying to solve triangle with more than two solved elements");
+        }
+
+        Node fixedPointNode {};
+        Node fixedLineNode {};
+
+        if (setElemnts.front().getStoredObj()->isElementType<Point>()) {
+            fixedPointNode = setElemnts.front();
+            fixedLineNode = setElemnts.back();
+        } else {
+            fixedPointNode = setElemnts.back();
+            fixedLineNode = setElemnts.front();
+        }
+
+        auto fixedLine = fixedLineNode.getStoredObj()->getElement<Line>();
+        auto fixedPoint = fixedPointNode.getStoredObj()->getElement<Point>();
+        auto unsetPoint = notSetElement.getStoredObj()->getElement<Point>();
+
+        auto outputCoords = Solver::calculatePointToPointDistanceTriangleOnLine(
+            { { fixedLine.x1, fixedLine.y1 }, { fixedLine.x2, fixedLine.y2 } },
+            { fixedPoint.x, fixedPoint.y },
+            subGraph.getEdgeBetweenNodes(fixedPointNode, notSetElement)
+                ->getStoredObj()
+                ->getConstraintValue(),
+            { { fixedLine.originalX1OnCanvas, fixedLine.originalY1OnCanvas },
+                { fixedLine.originalX2OnCanvas, fixedLine.originalY2OnCanvas },
+                { fixedPoint.OiriginalXOnCanvas, fixedPoint.OriginalYOnCanvas },
+                { unsetPoint.OiriginalXOnCanvas,
+                    unsetPoint.OriginalYOnCanvas } });
+
+        notSetElement.getStoredObj()->updateElementPosition(
+            outputCoords.x, outputCoords.y);
+    }
+
+    void solveFromZeroCalculatedNodesOneLine(ConstraintGraph& subGraph)
+    {
+        using Node = ConstraintGraph::NodeType;
+        auto nodes = subGraph.getNodes();
+
+        std::vector<Node> pointNodes;
+
+        Node lineNode;
+
+        for (const auto& node : nodes) {
+            if (node.getStoredObj()->isElementType<Point>()) {
+                pointNodes.push_back(node);
+            } else {
+                lineNode = node;
+            }
+        }
+
+        if (pointNodes.size() > 2) {
+            throw std::runtime_error("No line in system, bad function call");
+        }
+
+        auto line = lineNode.getStoredObj()->getElement<Line>();
+        pointNodes.front().getStoredObj()->updateElementPosition(0, 0);
+        // Starting line from origin while keeping the original orinetation
+
+        Solver::Coordinates2D linePoint2 { line.originalX2OnCanvas
+                - line.originalX1OnCanvas,
+            line.originalY2OnCanvas - line.originalY1OnCanvas };
+
+        linePoint2.normalize();
+
+        lineNode.getStoredObj()->updateElementPosition(
+            0, 0, linePoint2.x, linePoint2.y);
+
+        solveFromOneCalculatedNodesOneLine(subGraph);
+    }
+    //=================Points-On-Line Functions=================
+
+    // TODO: // Overload pattern helper (C++20) would solve this nicely, later
+    // refactor would help a lot
+    void callSolverFunc(ConstraintGraph& graph, const int numberOfSolvedNodes)
+    {
+        const auto& nodes = graph.getNodes();
+        const auto& edges = graph.getEdges();
+
+        std::shared_ptr<Element> lineNode { nullptr };
+
+        for (const auto& node : nodes) {
+            if (node.getStoredObj()->isElementType<Line>()) {
+                lineNode = node.getStoredObj();
+            }
+        }
+
+        if (!lineNode && numberOfSolvedNodes == 0) {
+            solveFromZeroCalculatedNodes(graph);
+        } else if (!lineNode && numberOfSolvedNodes == 2) {
+            solveFromTwoCalculatedNodes(graph);
+        } else if (lineNode && numberOfSolvedNodes == 0) {
+            solveFromZeroCalculatedNodesOneLine(graph);
+        } else if (lineNode && numberOfSolvedNodes == 2) {
+            if (lineNode->isElementSet()) {
+                solveFromOneCalculatedNodesOneLine(graph);
+            } else {
+                solveFromTwoCalculatedNodesOneLine(graph);
+            }
+        }
+    }
 }
 
 bool defaultDetectorFunc(const ConstraintGraph& constraintGraph)
@@ -149,6 +290,7 @@ void defaultResolverFunc(ConstraintGraph& constraintGraph)
     throw std::runtime_error("defaultResolverFunc not implemented");
 }
 
+// TODO take virtual edges into considerations
 std::vector<ConstraintGraph> defaultDecompositorFunc(
     ConstraintGraph& constraintGraph)
 {
@@ -170,9 +312,11 @@ std::vector<ConstraintGraph> defaultDecompositorFunc(
             && separationPair.second.has_value()) {
             // getGcsLogger()->debug(
             //     "separation pairs found in graph, separating...");
+            auto virtualConstraint
+                = std::make_shared<Constraint>(VirtualConstraint());
             return graph.separateByVerticesByDuplication(
-                { separationPair.first.value(),
-                    separationPair.second.value() });
+                { separationPair.first.value(), separationPair.second.value() },
+                virtualConstraint);
         } else {
             // getGcsLogger()->debug("No separation pairs found in graph");
             return {};
@@ -221,6 +365,22 @@ std::vector<ConstraintGraph> defaultDecompositorFunc(
     return result;
 }
 
+void debugPrint(const ConstraintGraph& graph)
+{
+    const auto& nodes = graph.getNodes();
+    const auto& edges = graph.getEdges();
+
+    for (const auto& node : nodes) {
+        std::cerr << node.getStoredObj()->toString() << std::endl;
+    }
+
+    for (const auto& edge : edges) {
+        std::cerr << edge.getStoredObj()->getConstraintName()
+                  << " value: " << edge.getStoredObj()->getConstraintValue()
+                  << std::endl;
+    }
+}
+
 void defaultSolverFunc(std::vector<ConstraintGraph>& subgraphs)
 {
     for (auto& graph : subgraphs) {
@@ -230,14 +390,25 @@ void defaultSolverFunc(std::vector<ConstraintGraph>& subgraphs)
         }
     }
 
-    auto starterGraph = subgraphs.front();
-    solveFromZeroCalculatedNodes(starterGraph);
+    auto noVirtualEdgeGraphs
+        = subgraphs | std::views::filter([](const ConstraintGraph& graph) {
+              return !graph.hasVirtualEdge();
+          });
+
+    std::cerr << "========================DEBUG===============" << std::endl;
+
+    // Calling for first graph with 0 solved nodes
+    std::cerr << "Calling first graph" << std::endl;
+    callSolverFunc(noVirtualEdgeGraphs.front(), 0);
+    debugPrint(noVirtualEdgeGraphs.front());
 
     // NOTE: this is ugly, a better solutions should be used once there is time
+    std::cerr << "Calling solvable graphs" << std::endl;
     while (true) {
-        auto solvableGraphs
-            = subgraphs | std::views::filter([](const ConstraintGraph& graph) {
-                  return getNumberOfCalculatedNode(graph) == 2;
+        auto solvableGraphs = noVirtualEdgeGraphs
+            | std::views::filter([](const ConstraintGraph& graph) {
+                  return getNumberOfCalculatedNode(graph)
+                      == needNodesToCalculate;
               });
 
         // There are no more solvable graphs
@@ -246,9 +417,24 @@ void defaultSolverFunc(std::vector<ConstraintGraph>& subgraphs)
         }
 
         for (auto& graph : solvableGraphs) {
-            solveFromTwoCalculatedNodes(graph);
+            callSolverFunc(graph, needNodesToCalculate);
+            debugPrint(graph);
         }
     }
+
+    std::cerr << "Calling virutal edges graphs" << std::endl;
+    // Solving the virtual edge ones.
+    auto virtualEdgeGraphs
+        = subgraphs | std::views::filter([](const ConstraintGraph& graph) {
+              return graph.hasVirtualEdge();
+          });
+
+    for (auto& graph : virtualEdgeGraphs) {
+        callSolverFunc(graph, needNodesToCalculate);
+        debugPrint(graph);
+    }
+
+    std::cerr << "========================DEBUG===============" << std::endl;
 }
 
 void GeometricConstraintSystem::solveGcsViaPipeline(
@@ -259,25 +445,6 @@ void GeometricConstraintSystem::solveGcsViaPipeline(
     }
 
     auto subraphs = graphDecompositor(constraintGraph);
-    getGcsLogger()->debug("============================================");
-    // getGcsLogger()->debug("============================================");
-    // getGcsLogger()->debug("Number of found subgraphs: {}", subraphs.size());
-    // int count { 0 };
-    // for (const auto& graph : subraphs) {
-    //     getGcsLogger()->debug("subgraphs: {}", count++);
-    //     const auto& nodes = graph.getNodes();
-    //     for (const auto& node : graph.getNodes()) {
-    //         std::cerr << node.getStoredObj().get() << std::endl;
-    //     }
-    //
-    //     getGcsLogger()->debug("getting edges between nodes");
-    //
-    //     for (const auto& edge : graph.getEdges()) {
-    //         std::cerr << edge.getStoredObj().get() << std::endl;
-    //     }
-    // }
-
-    getGcsLogger()->debug("============================================");
     subgraphSolver(subraphs);
 }
 

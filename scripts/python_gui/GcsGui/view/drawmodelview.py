@@ -15,6 +15,7 @@ from ..model import drawmodel
 class DrawingMethod(StrEnum):
     POINT = "Point"
     LINE = "Line"
+    LINE_WITH_POINTS = "Line with Points"
     CIRCLE = "Circle"
 
     @classmethod
@@ -29,7 +30,7 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
 
     class ConstraintDialog(Gtk.Dialog):
         def __init__(
-            self, parent, title="Enter a value", message="Enter a float value:"
+            self, parent, shape1, shape2, title="Add Constraint"
         ):
             super().__init__(
                 title=title,
@@ -40,34 +41,109 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
             self.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
             self.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
 
+            # Store shapes for validation
+            self.shape1 = shape1
+            self.shape2 = shape2
+
             # Set default size and border width
-            self.set_default_size(300, 100)
+            self.set_default_size(350, 200)
             self.set_border_width(10)
 
             # Create container for content
             content_area = self.get_content_area()
 
             # Create a vertical box to organize widgets
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
             content_area.add(box)
 
-            # Add the label
-            label = Gtk.Label(label=message)
-            label.set_halign(Gtk.Align.START)
-            box.pack_start(label, False, False, 0)
+            # Add info label about selected shapes
+            info_label = Gtk.Label()
+            info_label.set_markup(
+                f"<b>Selected shapes:</b>\n"
+                f"Shape 1: {type(shape1).__name__}\n"
+                f"Shape 2: {type(shape2).__name__}"
+            )
+            info_label.set_halign(Gtk.Align.START)
+            box.pack_start(info_label, False, False, 0)
 
-            # Add the float entry
+            # Add separator
+            box.pack_start(Gtk.Separator(), False, False, 0)
+
+            # Add constraint type selector
+            type_label = Gtk.Label(label="Constraint Type:")
+            type_label.set_halign(Gtk.Align.START)
+            box.pack_start(type_label, False, False, 0)
+
+            self.constraint_type_combo = Gtk.ComboBoxText()
+
+            # Determine available constraint types based on selected shapes
+            self.available_constraints = self._get_available_constraints()
+            for constraint_type in self.available_constraints:
+                self.constraint_type_combo.append_text(constraint_type)
+
+            if self.available_constraints:
+                self.constraint_type_combo.set_active(0)
+
+            self.constraint_type_combo.connect("changed", self._on_constraint_type_changed)
+            box.pack_start(self.constraint_type_combo, False, False, 0)
+
+            # Add value entry (for constraints that need a value)
+            self.value_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            self.value_label = Gtk.Label(label="Enter value:")
+            self.value_label.set_halign(Gtk.Align.START)
+            self.value_box.pack_start(self.value_label, False, False, 0)
+
             self.entry = Gtk.Entry()
             self.entry.set_activates_default(True)
-            box.pack_start(self.entry, True, True, 0)
+            self.value_box.pack_start(self.entry, False, False, 0)
+
+            box.pack_start(self.value_box, False, False, 0)
 
             # Set the OK button as default
             self.set_default_response(Gtk.ResponseType.OK)
 
+            # Update visibility based on initial selection
+            self._on_constraint_type_changed(self.constraint_type_combo)
+
             # Show all widgets
             self.show_all()
 
+        def _get_available_constraints(self):
+            """Determine which constraints are available based on selected shapes"""
+            constraints = []
+
+            # Distance constraint: available between any two shapes
+            constraints.append("Distance")
+
+            # Point-on-Line constraint: only available between Point and Line
+            if (isinstance(self.shape1, drawmodel.Point) and isinstance(self.shape2, drawmodel.Line)) or \
+               (isinstance(self.shape1, drawmodel.Line) and isinstance(self.shape2, drawmodel.Point)):
+                constraints.append("Point on Line")
+
+            # Tangency could be added here for Circle-Circle or Circle-Line
+            # constraints.append("Tangency")
+
+            return constraints
+
+        def _on_constraint_type_changed(self, combo):
+            """Show/hide value entry based on constraint type"""
+            constraint_type = combo.get_active_text()
+
+            if constraint_type == "Point on Line":
+                # Point-on-line doesn't need a value
+                self.value_box.hide()
+            else:
+                # Distance and other constraints need a value
+                self.value_box.show()
+                if constraint_type == "Distance":
+                    self.value_label.set_text("Enter distance value:")
+
+        def get_constraint_type(self):
+            """Get the selected constraint type"""
+            return self.constraint_type_combo.get_active_text()
+
         def get_float(self):
+            """Get the entered float value"""
             try:
                 return float(self.entry.get_text())
             except ValueError:
@@ -174,13 +250,28 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
                 cr.restore()
 
     def draw_element_labels(self, widget, cr: cairo.Context):
-        """Draw element type labels on shapes"""
+        """Draw element type labels with numbers on shapes"""
+        # Track count of each shape type
+        type_counters = {}
+
         for shape in self.shape_manager.shape_buffer:
+            # Skip invisible shapes (e.g., line defining points)
+            if not shape.visible:
+                continue
+
             shape_type = self.get_shape_type_name(shape)
             center = self.get_shape_center(shape)
 
             if center is None:
                 continue
+
+            # Increment counter for this shape type
+            if shape_type not in type_counters:
+                type_counters[shape_type] = 0
+            type_counters[shape_type] += 1
+
+            # Create label with number
+            label = f"{shape_type}{type_counters[shape_type]}"
 
             x, y = center
 
@@ -189,12 +280,76 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
             cr.select_font_face("Sans", cairo.FONT_SLANT_ITALIC, cairo.FONT_WEIGHT_NORMAL)
             cr.set_font_size(12)
 
-            text_extents = cr.text_extents(shape_type)
+            text_extents = cr.text_extents(label)
 
             # Draw text below the shape center
             cr.move_to(x - text_extents.width / 2, y + 25)
-            cr.show_text(shape_type)
+            cr.show_text(label)
             cr.restore()
+
+    def draw_extended_line(self, line: drawmodel.Line, widget, cr: cairo.Context):
+        """Draw a line, extending it slightly beyond any points that lie on it"""
+        import math
+
+        # Get all visible points
+        visible_points = [shape for shape in self.shape_manager.shape_buffer
+                         if isinstance(shape, drawmodel.Point) and shape.visible]
+
+        # Line vector and parameters
+        x1, y1 = line.defining_point_one.coords.x, line.defining_point_one.coords.y
+        x2, y2 = line.defining_point_two.coords.x, line.defining_point_two.coords.y
+
+        dx = x2 - x1
+        dy = y2 - y1
+        line_length = math.sqrt(dx * dx + dy * dy)
+
+        if line_length < 1e-6:  # Degenerate line
+            line.on_draw(widget, cr)
+            return
+
+        # Normalize direction vector
+        dir_x = dx / line_length
+        dir_y = dy / line_length
+
+        # Find points on the line and their projection parameters
+        tolerance = line.line_width + 2.0  # Distance tolerance for "on line"
+        extension_amount = 10.0  # How much to extend beyond points
+
+        min_t = 0.0
+        max_t = line_length
+
+        for point in visible_points:
+            px, py = point.coords.x, point.coords.y
+
+            # Calculate perpendicular distance from point to infinite line
+            # Using cross product formula
+            cross = abs((px - x1) * dy - (py - y1) * dx) / line_length
+
+            if cross <= tolerance:
+                # Point is close to the line, calculate projection parameter t
+                # t represents position along line: 0 at start, line_length at end
+                t = (px - x1) * dir_x + (py - y1) * dir_y
+
+                # Extend the line if this point projects beyond current endpoints
+                if t < min_t:
+                    min_t = t
+                elif t > max_t:
+                    max_t = t
+
+        # Calculate new endpoints
+        start_x = x1 + dir_x * (min_t - extension_amount)
+        start_y = y1 + dir_y * (min_t - extension_amount)
+        end_x = x1 + dir_x * (max_t + extension_amount)
+        end_y = y1 + dir_y * (max_t + extension_amount)
+
+        # Draw the extended line
+        cr.set_line_width(line.line_width)
+        cr.set_source_rgb(line.colour.red, line.colour.green, line.colour.blue)
+        cr.save()
+        cr.move_to(start_x, start_y)
+        cr.line_to(end_x, end_y)
+        cr.stroke()
+        cr.restore()
 
     def on_draw(self, widget, cr: cairo.Context):
 
@@ -223,7 +378,12 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
 
         ### Drawing the shapes
         for shape in self.shape_manager.shape_buffer:
-            shape.on_draw(widget, cr)
+            if shape.visible:
+                # Special handling for lines to extend them beyond points
+                if isinstance(shape, drawmodel.Line):
+                    self.draw_extended_line(shape, widget, cr)
+                else:
+                    shape.on_draw(widget, cr)
 
         ### Drawing constraints if enabled
         if self.show_constraints and self.gcs_system is not None:
@@ -247,6 +407,9 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
         # Currently one constraint can be added at a time on the gui
         if len(self.selected_items) < 2:
             for shape in self.shape_manager.shape_buffer:
+                # Skip invisible shapes (e.g., line defining points)
+                if not shape.visible:
+                    continue
                 if shape.is_hit_by_point(
                     drawmodel.CanvasCoord(event.x, event.y)
                 ):
@@ -259,34 +422,61 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
         if len(self.selected_items) == 2:
             constraint_dialog = self.ConstraintDialog(
                 self.get_toplevel(),
-                title="Add Distance Constraint",
-                message="Enter distance value:",
+                self.selected_items[0],
+                self.selected_items[1],
             )
             err = constraint_dialog.run()
 
-            if err == Gtk.ResponseType.OK:
-                constraint_value = constraint_dialog.get_float()
-                if constraint_value is not None and self.gcs_system is not None:
-                    # Add constraint to the geometric constraint system
-                    success = self.gcs_system.add_constraint_between_shapes(
-                        self.selected_items[0],
-                        self.selected_items[1],
-                        "distance",
-                        constraint_value,
-                    )
-                    if success:
-                        print(
-                            f"✓ Added distance constraint: {constraint_value}"
+            if err == Gtk.ResponseType.OK and self.gcs_system is not None:
+                constraint_type = constraint_dialog.get_constraint_type()
+
+                if constraint_type == "Distance":
+                    constraint_value = constraint_dialog.get_float()
+                    if constraint_value is not None:
+                        # Add distance constraint
+                        success = self.gcs_system.add_constraint_between_shapes(
+                            self.selected_items[0],
+                            self.selected_items[1],
+                            "distance",
+                            constraint_value,
                         )
-                        # Print current graph info
-                        info = self.gcs_system.get_constraint_graph_info()
-                        print(
-                            f"Graph info: {info['nodes']} nodes, {info['edges']} edges, well-constrained: {info['well_constrained']}"
-                        )
+                        if success:
+                            print(f"✓ Added distance constraint: {constraint_value}")
+                        else:
+                            print("✗ Failed to add distance constraint")
                     else:
-                        print("✗ Failed to add constraint")
-                else:
-                    print("✗ Invalid constraint value")
+                        print("✗ Invalid constraint value")
+
+                elif constraint_type == "Point on Line":
+                    # Determine which shape is the point and which is the line
+                    shape1, shape2 = self.selected_items[0], self.selected_items[1]
+                    if isinstance(shape1, drawmodel.Point) and isinstance(shape2, drawmodel.Line):
+                        point_shape, line_shape = shape1, shape2
+                    elif isinstance(shape1, drawmodel.Line) and isinstance(shape2, drawmodel.Point):
+                        line_shape, point_shape = shape1, shape2
+                    else:
+                        print("✗ Point on Line constraint requires a Point and a Line")
+                        point_shape, line_shape = None, None
+
+                    if point_shape and line_shape:
+                        # Add point-on-line constraint
+                        success = self.gcs_system.add_constraint_between_shapes(
+                            point_shape,
+                            line_shape,
+                            "pointonline",
+                            0.0,  # No value needed for point-on-line
+                        )
+                        if success:
+                            print("✓ Added point-on-line constraint")
+                        else:
+                            print("✗ Failed to add point-on-line constraint")
+
+                # Print current graph info
+                info = self.gcs_system.get_constraint_graph_info()
+                print(
+                    f"Graph info: {info['nodes']} nodes, {info['edges']} edges, "
+                    f"well-constrained: {info['well_constrained']}"
+                )
 
             # Reset selection colors
             for selected in self.selected_items:
@@ -326,16 +516,17 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
                         event.y,
                         self.current_width,
                         copy.deepcopy(self.current_colour),
+                        visible=False,  # Hide line defining points
                     )
                     self.shape_manager.shape_buffer.append(new_point)
-                    # Add to constraint graph
-                    self.add_shape_to_constraint_graph(new_point)
+                    # Don't add defining point to constraint graph
                 else:
                     end_point = drawmodel.Point(
                         event.x,
                         event.y,
                         copy.deepcopy(self.current_width),
                         copy.deepcopy(self.current_colour),
+                        visible=False,  # Hide line defining points
                     )
                     new_line = drawmodel.Line(
                         self.shape_manager.shape_buffer[-1],
@@ -346,13 +537,51 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
                     self.shape_manager.shape_buffer.append(new_line)
                     self.shape_manager.shape_buffer.append(end_point)
 
-                    # Add both line and end point to constraint graph
+                    # Add only the line to constraint graph (not the defining points)
                     self.add_shape_to_constraint_graph(new_line)
-                    self.add_shape_to_constraint_graph(end_point)
 
                     self.temp_start_point = False
 
                 self.queue_draw()
+
+            case DrawingMethod.LINE_WITH_POINTS:
+                if not self.temp_start_point:
+                    self.temp_start_point = True
+                    new_point = drawmodel.Point(
+                        event.x,
+                        event.y,
+                        self.current_width,
+                        copy.deepcopy(self.current_colour),
+                        visible=True,  # Show points
+                    )
+                    self.shape_manager.shape_buffer.append(new_point)
+                    # Add point to constraint graph
+                    self.add_shape_to_constraint_graph(new_point)
+                else:
+                    end_point = drawmodel.Point(
+                        event.x,
+                        event.y,
+                        copy.deepcopy(self.current_width),
+                        copy.deepcopy(self.current_colour),
+                        visible=True,  # Show points
+                    )
+                    new_line = drawmodel.Line(
+                        self.shape_manager.shape_buffer[-1],
+                        end_point,
+                        copy.deepcopy(self.current_width),
+                        copy.deepcopy(self.current_colour),
+                    )
+                    self.shape_manager.shape_buffer.append(new_line)
+                    self.shape_manager.shape_buffer.append(end_point)
+
+                    # Add only the end point to constraint graph (start point already added)
+                    self.add_shape_to_constraint_graph(end_point)
+                    # Don't add the line to constraint graph
+
+                    self.temp_start_point = False
+
+                self.queue_draw()
+
             case DrawingMethod.CIRCLE:
                 new_circle = drawmodel.Circle(
                     drawmodel.CanvasCoord(event.x, event.y),
@@ -431,6 +660,7 @@ class DrawingLayout(Gtk.Grid):
         draw_methods = [
             DrawingMethod.POINT,
             DrawingMethod.LINE,
+            DrawingMethod.LINE_WITH_POINTS,
             DrawingMethod.CIRCLE,
         ]
         drawing_combo = Gtk.ComboBoxText()

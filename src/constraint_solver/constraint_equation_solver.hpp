@@ -1,6 +1,8 @@
 #ifndef CONSTRAINT_EQUATION_SOLVER_HPP
 #define CONSTRAINT_EQUATION_SOLVER_HPP
 
+#include "elements.hpp"
+#include <cmath>
 #include <string>
 #include <format>
 
@@ -8,6 +10,13 @@ namespace Solver {
 struct Coordinates2D {
     double x;
     double y;
+
+    void normalize()
+    {
+        float len = std::sqrt(x * x + y * y);
+        x /= len;
+        y /= len;
+    }
 };
 
 struct TriangleOrientationHeuristicData {
@@ -22,6 +31,13 @@ struct TriangleOrientationHeuristicData {
             fixedPointPone.x, fixedPointPone.y, fixedPointPtwo.x,
             fixedPointPtwo.y, freePointPthree.x, freePointPthree.y);
     }
+};
+
+struct PointOnLineOrientationHeuristicData {
+    Coordinates2D fixedLinePone;
+    Coordinates2D fixedLinePtwo;
+    Coordinates2D fixedPointPone;
+    Coordinates2D freePointPtwo;
 };
 
 /**
@@ -60,6 +76,11 @@ calculatePointToPointDistanceTriangle(const double xToYDistance,
 Coordinates2D calculatePointToPointDistanceTriangleFromTwoFixedPoints(
     const Coordinates2D& p1, const Coordinates2D& p2, const double distanceP2P3,
     const double distanceP1P3, TriangleOrientationHeuristicData heuristicInfo);
+
+Coordinates2D calculatePointToPointDistanceTriangleOnLine(
+    std::pair<Coordinates2D, Coordinates2D> fixedLine,
+    Coordinates2D fixedPointOnLine, double distanceFromFixedPoint,
+    PointOnLineOrientationHeuristicData heuristicInfo);
 
 }; // namespace Solver
 

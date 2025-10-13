@@ -19,9 +19,10 @@ class ShapeManager:
 
 
 class Drawable(ABC):
-    def __init__(self, line_width: float, colour: common.RgbColour):
+    def __init__(self, line_width: float, colour: common.RgbColour, visible: bool = True):
         self.colour: common.RgbColour = colour
         self.line_width = line_width
+        self.visible = visible
 
     @abstractmethod
     def on_draw(self, wid, cr: cairo.Context):
@@ -51,8 +52,9 @@ class Point(Drawable):
         line_width: float,
         colour: common.RgbColour,
         radius: float = 5,
+        visible: bool = True,
     ):
-        super().__init__(line_width, colour)
+        super().__init__(line_width, colour, visible)
         self.coords: CanvasCoord = CanvasCoord(x, y)
         self.point_radius = radius
 
@@ -91,7 +93,8 @@ class Point(Drawable):
             "y": self.coords.y,
             "line_width": self.line_width,
             "colour": {"r": self.colour.red, "g": self.colour.green, "b": self.colour.blue},
-            "radius": self.point_radius
+            "radius": self.point_radius,
+            "visible": self.visible
         }
 
     @staticmethod
@@ -107,15 +110,16 @@ class Point(Drawable):
             data["y"],
             data["line_width"],
             colour,
-            data.get("radius", 5)
+            data.get("radius", 5),
+            data.get("visible", True)
         )
 
 
 class Line(Drawable):
     def __init__(
-        self, x: Point, y: Point, line_width: float, colour: common.RgbColour
+        self, x: Point, y: Point, line_width: float, colour: common.RgbColour, visible: bool = True
     ):
-        super().__init__(line_width, colour)
+        super().__init__(line_width, colour, visible)
         self.defining_point_one = x
         self.defining_point_two = y
 
@@ -185,7 +189,8 @@ class Line(Drawable):
             "point_one": self.defining_point_one.to_dict(),
             "point_two": self.defining_point_two.to_dict(),
             "line_width": self.line_width,
-            "colour": {"r": self.colour.red, "g": self.colour.green, "b": self.colour.blue}
+            "colour": {"r": self.colour.red, "g": self.colour.green, "b": self.colour.blue},
+            "visible": self.visible
         }
 
     @staticmethod
@@ -198,7 +203,7 @@ class Line(Drawable):
         )
         point_one = Point.from_dict(data["point_one"])
         point_two = Point.from_dict(data["point_two"])
-        return Line(point_one, point_two, data["line_width"], colour)
+        return Line(point_one, point_two, data["line_width"], colour, data.get("visible", True))
 
 
 class Circle(Drawable):
@@ -208,8 +213,9 @@ class Circle(Drawable):
         radius: float,
         line_width: float,
         colour: common.RgbColour,
+        visible: bool = True,
     ):
-        super().__init__(line_width, colour)
+        super().__init__(line_width, colour, visible)
         self.center: CanvasCoord = center
         self.radius: float = radius
 
@@ -253,7 +259,8 @@ class Circle(Drawable):
             "center_y": self.center.y,
             "radius": self.radius,
             "line_width": self.line_width,
-            "colour": {"r": self.colour.red, "g": self.colour.green, "b": self.colour.blue}
+            "colour": {"r": self.colour.red, "g": self.colour.green, "b": self.colour.blue},
+            "visible": self.visible
         }
 
     @staticmethod
@@ -265,4 +272,4 @@ class Circle(Drawable):
             data["colour"]["b"]
         )
         center = CanvasCoord(data["center_x"], data["center_y"])
-        return Circle(center, data["radius"], data["line_width"], colour)
+        return Circle(center, data["radius"], data["line_width"], colour, data.get("visible", True))

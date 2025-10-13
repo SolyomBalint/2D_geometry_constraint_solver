@@ -58,6 +58,8 @@ public:
 
     const Common::Uuid& getId() const { return id; }
 
+    bool isVirtual() const { return false; }
+
     bool operator==(const DefaultEdge& other) const { return id == other.id; }
 };
 

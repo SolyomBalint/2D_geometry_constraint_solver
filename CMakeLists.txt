@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.31)
+cmake_minimum_required(VERSION 4.1)
 
 project(2d_geometry_constraint_solver)
 
@@ -18,6 +18,7 @@ find_package(ogdf REQUIRED)
 find_package(stduuid REQUIRED)
 find_package(argparse REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(nlohmann_json REQUIRED)
 find_package(Python COMPONENTS Development Interpreter REQUIRED)
 
 ######################## Downloading packages that are currently not available ########################
@@ -65,6 +66,9 @@ if(GENERATE_PYTHON_BINDINGS)
                         src/python_bindings/constraint_graph_handle.cpp
                         src/constraint_solver/geometric_constraint_system.cpp
                         src/constraint_solver/constraint_equation_solver.cpp
+                        src/constraint_solver/elements.cpp
+                        src/constraint_solver/constraints.cpp
+                        src/constraint_solver/json_constraint_graph_loader.cpp
                         src/common/common/common_uuid.cpp)
     target_include_directories(constraint_graph_handle_binding PRIVATE
                 src/common
@@ -76,7 +80,7 @@ if(GENERATE_PYTHON_BINDINGS)
                 ${Eigen3_INCLUDE_DIRS})
 
     target_compile_definitions(constraint_graph_handle_binding PRIVATE SPDLOG_USE_STD_FORMAT LIBUUID_CPP20_OR_GREATER)
-    target_link_libraries(constraint_graph_handle_binding PRIVATE spdlog::spdlog ogdf::ogdf stduuid::stduuid autodiff::autodiff Eigen3::Eigen)
+    target_link_libraries(constraint_graph_handle_binding PRIVATE spdlog::spdlog ogdf::ogdf stduuid::stduuid autodiff::autodiff Eigen3::Eigen nlohmann_json::nlohmann_json)
 endif()
 
 ######################## Optionally setting up nanobind for python binding generation ########################
@@ -90,6 +94,9 @@ endif()
 add_executable(${PROJECT_NAME}  src/main.cpp
                                 src/constraint_solver/constraint_equation_solver.cpp
                                 src/constraint_solver/geometric_constraint_system.cpp
+                                src/constraint_solver/elements.cpp
+                                src/constraint_solver/constraints.cpp
+                                src/constraint_solver/json_constraint_graph_loader.cpp
                                 src/common/common/common_uuid.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ./include
@@ -104,7 +111,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE ./include
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE SPDLOG_USE_STD_FORMAT LIBUUID_CPP20_OR_GREATER)
 target_link_libraries(${PROJECT_NAME} PRIVATE   stduuid::stduuid argparse::argparse ogdf::ogdf
-                                                spdlog::spdlog autodiff::autodiff Eigen3::Eigen)
+                                                spdlog::spdlog autodiff::autodiff Eigen3::Eigen nlohmann_json::nlohmann_json)
 
 # Explanation why these flags are used:
 # -ggdb: if debugging use it for full support of gdb

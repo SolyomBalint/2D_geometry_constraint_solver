@@ -3,7 +3,6 @@
 
 #include <string>
 #include <variant>
-#include <format>
 
 namespace Gcs {
 
@@ -17,76 +16,42 @@ struct Point {
     double OiriginalXOnCanvas;
     double OriginalYOnCanvas;
     double x, y;
-    Point() { };
-    explicit Point(double xCoordCanvas, double yCoordCanvas)
-        : OiriginalXOnCanvas { xCoordCanvas }
-        , OriginalYOnCanvas { yCoordCanvas }
-        , x { 0 }
-        , y { 0 }
-    {
-    }
-    std::string getTypeName() const { return "Point"; }
-    std::string toString() const
-    {
-        return std::format("CanvasCoords({},{}), Calculated({},{})",
-            OiriginalXOnCanvas, OriginalYOnCanvas, x, y);
-    }
-    void updateElementPosition(double new_x, double new_y)
-    {
-        x = new_x;
-        y = new_y;
-    }
+
+    Point();
+    explicit Point(double xCoordCanvas, double yCoordCanvas);
+
+    std::string getTypeName() const;
+    std::string toString() const;
+    void updateElementPosition(double new_x, double new_y);
 };
 
 struct FixedRadiusCircle {
     double x, y;
     double fixed_radius;
-    FixedRadiusCircle() { };
-    explicit FixedRadiusCircle(double x_coord, double y_coord, double r)
-        : x { x_coord }
-        , y { y_coord }
-        , fixed_radius { r }
-    {
-    }
-    std::string getTypeName() const { return "FixedRadiusCircle"; }
-    std::string toString() const
-    {
-        return std::format(
-            "FixedRadiusCircle(x: {}, y: {}, radius: {})", x, y, fixed_radius);
-    }
-    void updateElementPosition(double new_x, double new_y)
-    {
-        x = new_x;
-        y = new_y;
-    }
+
+    FixedRadiusCircle();
+    explicit FixedRadiusCircle(double x_coord, double y_coord, double r);
+
+    std::string getTypeName() const;
+    std::string toString() const;
+    void updateElementPosition(double new_x, double new_y);
 };
 
 struct Line {
-    double r0_x, r0_y;
-    double v_x, v_y;
-    Line() { };
-    explicit Line(
-        double r0_x_coord, double r0_y_coord, double v_x_dir, double v_y_dir)
-        : r0_x { r0_x_coord }
-        , r0_y { r0_y_coord }
-        , v_x { v_x_dir }
-        , v_y { v_y_dir }
-    {
-    }
-    std::string getTypeName() const { return "Line"; }
-    std::string toString() const
-    {
-        return std::format(
-            "Line(r0: ({}, {}), v: ({}, {}))", r0_x, r0_y, v_x, v_y);
-    }
+    double originalX1OnCanvas;
+    double originalY1OnCanvas;
+    double originalX2OnCanvas;
+    double originalY2OnCanvas;
+    double x1, y1;
+    double x2, y2;
+
+    Line();
+    explicit Line(double, double, double, double);
+
+    std::string getTypeName() const;
+    std::string toString() const;
     void updateElementPosition(
-        double new_r0_x, double new_r0_y, double new_v_x, double new_v_y)
-    {
-        r0_x = new_r0_x;
-        r0_y = new_r0_y;
-        v_x = new_v_x;
-        v_y = new_v_y;
-    }
+        double new_x1, double new_y1, double new_x2, double new_y2);
 };
 
 template <ElementType... Types> using ElementInterface = std::variant<Types...>;
@@ -108,6 +73,7 @@ public:
         : element { e }
     {
     }
+
     template <typename T> bool isElementType() const
     {
         return std::holds_alternative<T>(element);
@@ -118,17 +84,8 @@ public:
         return std::visit(visitor, element);
     }
 
-    std::string getElementName() const
-    {
-        return std::visit(
-            [](const auto& element) { return element.getTypeName(); }, element);
-    }
-
-    std::string toString() const
-    {
-        return std::visit(
-            [](const auto& element) { return element.toString(); }, element);
-    }
+    std::string getElementName() const;
+    std::string toString() const;
 
     template <typename T> T& getElement() { return std::get<T>(element); }
 

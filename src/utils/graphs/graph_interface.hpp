@@ -72,6 +72,13 @@ public:
     auto getId() const { return impl_.getId(); }
 
     /**
+     * @brief Check if this edge is a virtual edge (added during decomposition)
+     *
+     * @return true if the edge is virtual, false otherwise
+     */
+    bool isVirtual() const { return impl_.isVirtual(); }
+
+    /**
      * @brief This function is meant to make writing wrappers easier, do not
      * depend in this otherwise changing backend may result in breaking code
      *
@@ -267,11 +274,12 @@ public:
     }
 
     std::vector<GraphInterface> separateByVerticesByDuplication(
-        const std::vector<NodeType>& separatorNodes)
+        const std::vector<NodeType>& separatorNodes,
+        std::shared_ptr<EdgeStoredObject> virtualEdgeObj = nullptr)
     {
         std::vector<GraphInterface> subGraphs;
         auto implSubGraphs
-            = impl_.separateByVerticesByDuplication(separatorNodes);
+            = impl_.separateByVerticesByDuplication(separatorNodes, virtualEdgeObj);
         for (auto& subGraph : implSubGraphs) {
             subGraphs.emplace_back(std::move(subGraph));
         }
@@ -291,6 +299,8 @@ public:
     {
         return impl_.getEdgeBetweenNodes(node1, node2);
     }
+
+    bool hasVirtualEdge() const { return impl_.hasVirtualEdge(); }
 
     Common::Uuid getId() const { return id_; }
 
