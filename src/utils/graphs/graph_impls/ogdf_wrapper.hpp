@@ -185,8 +185,12 @@ private:
                 }
             }
 
-            // Create virtual edge if no edge exists
-            if (!edgeExists) {
+            // Create virtual edge if no edge exists TODO: this is not the full
+            // laman check
+            bool isWellconstrained
+                = subgraph.getEdgeCount() == 2 * subgraph.getNodeCount() - 3;
+            bool isBiconnected = subgraph.getCutVertices().empty();
+            if (!isBiconnected) {
                 EdgeType virtualEdge(OGDFEdgeImpl(true), virtualEdgeObj);
                 Common::Uuid edgeId = virtualEdge.getId();
 
@@ -363,20 +367,9 @@ public:
             componentNodeSets.push_back(componentNodes);
         }
 
-        // Find the largest component size
-        size_t maxComponentSize = 0;
         for (const auto& componentNodes : componentNodeSets) {
-            if (componentNodes.size() > maxComponentSize) {
-                maxComponentSize = componentNodes.size();
-            }
-        }
-
-        // Create subgraphs, adding virtual edges only to smaller components
-        for (const auto& componentNodes : componentNodeSets) {
-            bool isLargestComponent = (componentNodes.size() == maxComponentSize);
-            auto virtualEdge = isLargestComponent ? nullptr : virtualEdgeObj;
             subGraphs.push_back(
-                createSubgraph(componentNodes, separatorUuids, virtualEdge));
+                createSubgraph(componentNodes, separatorUuids, virtualEdgeObj));
         }
 
         return subGraphs;

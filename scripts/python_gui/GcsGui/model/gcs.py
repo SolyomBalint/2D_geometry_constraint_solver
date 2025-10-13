@@ -45,6 +45,11 @@ class GeometricConstraintSystem:
             print("✗ Cannot add shape: C++ bindings not available")
             return None
 
+        # Skip lines marked as visual-only (not to be added to constraint graph)
+        if isinstance(shape, drawmodel.Line) and not shape.add_to_constraint_graph:
+            print(f"Skipping visual-only line (not adding to constraint graph)")
+            return None
+
         try:
             # Convert drawable shape to graph node using handle API
             if isinstance(shape, drawmodel.Point):
@@ -401,27 +406,42 @@ class GeometricConstraintSystem:
             return []
 
     def remove_shape(self, shape: drawmodel.Drawable):
-        """Remove a shape from the constraint graph"""
-        # Note: Current ConstraintGraphHandle doesn't support node removal
-        # This would require rebuilding the graph
-        print("⚠ Warning: Shape removal not implemented in ConstraintGraphHandle")
-        print("  Consider rebuilding the graph if needed")
-
+        """Remove a shape from the constraint graph by rebuilding it"""
         node_id = self.shape_to_node_id.get(shape)
-        if node_id is not None:
-            # Remove from shape mapping
-            del self.shape_to_node_id[shape]
+        if node_id is None:
+            return False
 
-            # Remove from constraints list
-            self.constraints = [
-                (s1, s2, constraint_type, value)
-                for s1, s2, constraint_type, value in self.constraints
-                if s1 != shape and s2 != shape
-            ]
+        print(f"Removing shape {type(shape).__name__} (node {node_id}) from constraint graph")
 
-            print(f"Removed shape {type(shape).__name__} (node {node_id}) from tracking")
-            return True
-        return False
+        # Store constraints before clearing (filter out those involving removed shape)
+        remaining_constraints = [
+            (s1, s2, constraint_type, value)
+            for s1, s2, constraint_type, value in self.constraints
+            if s1 != shape and s2 != shape
+        ]
+
+        # Clear the constraint graph
+        if BINDINGS_AVAILABLE and self.graph_handle is not None:
+            self.graph_handle.clear()
+
+        self.shape_to_node_id.clear()
+        self.constraints.clear()
+
+        # Rebuild constraint graph with remaining shapes from shape buffer
+        print(f"  Rebuilding constraint graph...")
+        for existing_shape in self.shape_data_ref.shape_buffer:
+            # Skip the shape we're removing (it should already be removed from buffer by caller)
+            if existing_shape == shape:
+                continue
+            # Add shape to constraint graph
+            self.add_shape_as_node(existing_shape)
+
+        # Re-add all constraints
+        for s1, s2, constraint_type, value in remaining_constraints:
+            self.add_constraint_between_shapes(s1, s2, constraint_type, value)
+
+        print(f"  Rebuilt constraint graph: {len(self.shape_to_node_id)} nodes, {len(self.constraints)} constraints")
+        return True
 
     def clear_constraint_graph(self):
         """Clear the entire constraint graph"""
@@ -447,13 +467,15 @@ class GeometricConstraintSystem:
     def save_to_file(self, filename: str):
         """Save the current drawing and constraints to a JSON file"""
         try:
+            # Build shape-to-index mapping first (needed for Line serialization)
+            shape_to_index = {}
+            for i, shape in enumerate(self.shape_data_ref.shape_buffer):
+                shape_to_index[shape] = i
+
             # Serialize all shapes
             shapes_data = []
-            shape_to_index = {}  # Map shape object to its index
-
-            for i, shape in enumerate(self.shape_data_ref.shape_buffer):
-                shapes_data.append(shape.to_dict())
-                shape_to_index[shape] = i
+            for shape in self.shape_data_ref.shape_buffer:
+                shapes_data.append(shape.to_dict(shape_to_index=shape_to_index))
 
             # Serialize constraints (using shape indices instead of references)
             constraints_data = []
@@ -498,23 +520,36 @@ class GeometricConstraintSystem:
             self.shape_data_ref.shape_buffer.clear()
             self.clear_constraint_graph()
 
-            # Deserialize shapes
+            # Deserialize shapes in two passes:
+            # Pass 1: Load all Point and Circle objects (Lines need references to Points)
             shape_objects = []
-            for shape_data in save_data["shapes"]:
+            point_map = {}  # Map from shape index to Point objects
+
+            for i, shape_data in enumerate(save_data["shapes"]):
                 shape_type = shape_data["type"]
 
                 if shape_type == "Point":
                     shape = drawmodel.Point.from_dict(shape_data)
-                elif shape_type == "Line":
-                    shape = drawmodel.Line.from_dict(shape_data)
+                    shape_objects.append(shape)
+                    point_map[i] = shape  # Store Point reference with its index
+                    self.shape_data_ref.shape_buffer.append(shape)
                 elif shape_type == "Circle":
                     shape = drawmodel.Circle.from_dict(shape_data)
+                    shape_objects.append(shape)
+                    self.shape_data_ref.shape_buffer.append(shape)
+                elif shape_type == "Line":
+                    # Placeholder for now, will be processed in pass 2
+                    shape_objects.append(None)
                 else:
                     print(f"Warning: Unknown shape type {shape_type}")
-                    continue
+                    shape_objects.append(None)
 
-                shape_objects.append(shape)
-                self.shape_data_ref.shape_buffer.append(shape)
+            # Pass 2: Load Line objects with point_map
+            for i, shape_data in enumerate(save_data["shapes"]):
+                if shape_data["type"] == "Line":
+                    shape = drawmodel.Line.from_dict(shape_data, point_map=point_map)
+                    shape_objects[i] = shape
+                    self.shape_data_ref.shape_buffer.append(shape)
 
             # Rebuild constraints and constraint graph
             for constraint_data in save_data["constraints"]:

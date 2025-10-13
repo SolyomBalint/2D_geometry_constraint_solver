@@ -164,8 +164,18 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
             DrawingMethod.POINT
         )  # Based on DrawingLayout combobox initialization
         self.temp_start_point: bool = False
+        self.line_with_points_last_point: drawmodel.Point = None  # Track last point in continuous drawing
+        self.line_with_points_closing_point: drawmodel.Point = None  # Track point selected for closing the chain
         self.selected_items: list = []
         self.show_constraints: bool = False  # Toggle for constraint rendering
+
+        # Zoom and pan state
+        self.zoom_level: float = 1.0  # 1.0 = 100%, 2.0 = 200%, 0.5 = 50%
+        self.pan_offset_x: float = 0.0
+        self.pan_offset_y: float = 0.0
+        self.min_zoom: float = 0.1
+        self.max_zoom: float = 10.0
+
         self.connect("draw", self.on_draw)
 
         self.set_hexpand(True)
@@ -174,11 +184,26 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
             Gdk.EventMask.BUTTON_PRESS_MASK
             | Gdk.EventMask.BUTTON_RELEASE_MASK
             | Gdk.EventMask.BUTTON1_MOTION_MASK
+            | Gdk.EventMask.SCROLL_MASK  # Enable scroll events for zooming
+            | Gdk.EventMask.SMOOTH_SCROLL_MASK  # Enable smooth scrolling
             # | Gdk.EventMask.POINTER_MOTION_MASK  # Receives all mouse motion regardless of event
         )  # Mouse events have to be enabled manually
         self.connect("button-press-event", self.on_button_press)
         self.connect("button-release-event", self.on_button_release)
         self.connect("motion-notify-event", self.on_motion_notify)
+        self.connect("scroll-event", self.on_scroll)
+
+    def screen_to_world(self, screen_x: float, screen_y: float) -> tuple[float, float]:
+        """Convert screen coordinates to world coordinates"""
+        world_x = (screen_x - self.pan_offset_x) / self.zoom_level
+        world_y = (screen_y - self.pan_offset_y) / self.zoom_level
+        return (world_x, world_y)
+
+    def world_to_screen(self, world_x: float, world_y: float) -> tuple[float, float]:
+        """Convert world coordinates to screen coordinates"""
+        screen_x = world_x * self.zoom_level + self.pan_offset_x
+        screen_y = world_y * self.zoom_level + self.pan_offset_y
+        return (screen_x, screen_y)
 
     def get_shape_center(self, shape):
         """Get the center point of a shape for constraint rendering"""
@@ -287,6 +312,44 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
             cr.show_text(label)
             cr.restore()
 
+    def draw_visual_only_line(self, line: drawmodel.Line, widget, cr: cairo.Context):
+        """Draw a visual-only line that stops at the edge of point circles"""
+        import math
+
+        x1, y1 = line.defining_point_one.coords.x, line.defining_point_one.coords.y
+        x2, y2 = line.defining_point_two.coords.x, line.defining_point_two.coords.y
+
+        # Calculate direction vector
+        dx = x2 - x1
+        dy = y2 - y1
+        length = math.sqrt(dx * dx + dy * dy)
+
+        if length < 1e-6:  # Degenerate line
+            return
+
+        # Normalize direction
+        dir_x = dx / length
+        dir_y = dy / length
+
+        # Get the radii of the defining points (if they are Point objects)
+        radius1 = line.defining_point_one.point_radius if isinstance(line.defining_point_one, drawmodel.Point) else 0
+        radius2 = line.defining_point_two.point_radius if isinstance(line.defining_point_two, drawmodel.Point) else 0
+
+        # Shorten the line by the point radii so it stops at the edge
+        start_x = x1 + dir_x * radius1
+        start_y = y1 + dir_y * radius1
+        end_x = x2 - dir_x * radius2
+        end_y = y2 - dir_y * radius2
+
+        # Draw the shortened line
+        cr.set_line_width(line.line_width)
+        cr.set_source_rgb(line.colour.red, line.colour.green, line.colour.blue)
+        cr.save()
+        cr.move_to(start_x, start_y)
+        cr.line_to(end_x, end_y)
+        cr.stroke()
+        cr.restore()
+
     def draw_extended_line(self, line: drawmodel.Line, widget, cr: cairo.Context):
         """Draw a line, extending it slightly beyond any points that lie on it"""
         import math
@@ -353,35 +416,64 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
 
     def on_draw(self, widget, cr: cairo.Context):
 
-        ### Drawing the grid
+        ### Get canvas dimensions
         width = widget.get_allocated_width()
         height = widget.get_allocated_height()
 
+        ### Apply zoom and pan transformations
+        cr.save()
+        cr.translate(self.pan_offset_x, self.pan_offset_y)
+        cr.scale(self.zoom_level, self.zoom_level)
+
+        ### Drawing the grid (in world space)
         # Grid parameters
         grid_size = 40
 
-        # Set grid line properties
+        # Calculate visible world space bounds
+        # Top-left corner in world space
+        world_left = -self.pan_offset_x / self.zoom_level
+        world_top = -self.pan_offset_y / self.zoom_level
+        # Bottom-right corner in world space
+        world_right = (width - self.pan_offset_x) / self.zoom_level
+        world_bottom = (height - self.pan_offset_y) / self.zoom_level
+
+        # Extend bounds slightly to ensure grid covers entire canvas
+        world_left = int(world_left / grid_size) * grid_size - grid_size
+        world_top = int(world_top / grid_size) * grid_size - grid_size
+        world_right = int(world_right / grid_size) * grid_size + 2 * grid_size
+        world_bottom = int(world_bottom / grid_size) * grid_size + 2 * grid_size
+
+        # Set grid line properties (scale line width inversely with zoom)
         cr.set_source_rgb(0.8, 0.8, 0.8)  # Light gray
-        cr.set_line_width(1)
+        cr.set_line_width(1.0 / self.zoom_level)  # Keep line width constant in screen space
 
         # Draw vertical lines
-        for x in range(0, width, grid_size):
-            cr.move_to(x, 0)
-            cr.line_to(x, height)
+        x = world_left
+        while x <= world_right:
+            cr.move_to(x, world_top)
+            cr.line_to(x, world_bottom)
+            x += grid_size
 
         # Draw horizontal lines
-        for y in range(0, height, grid_size):
-            cr.move_to(0, y)
-            cr.line_to(width, y)
+        y = world_top
+        while y <= world_bottom:
+            cr.move_to(world_left, y)
+            cr.line_to(world_right, y)
+            y += grid_size
 
         cr.stroke()
 
         ### Drawing the shapes
         for shape in self.shape_manager.shape_buffer:
             if shape.visible:
-                # Special handling for lines to extend them beyond points
+                # Special handling for lines
                 if isinstance(shape, drawmodel.Line):
-                    self.draw_extended_line(shape, widget, cr)
+                    if shape.add_to_constraint_graph:
+                        # Normal lines: extend beyond points for visibility
+                        self.draw_extended_line(shape, widget, cr)
+                    else:
+                        # Visual-only lines: stop at the edge of defining points
+                        self.draw_visual_only_line(shape, widget, cr)
                 else:
                     shape.on_draw(widget, cr)
 
@@ -392,6 +484,9 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
         ### Drawing element type labels if constraint rendering is enabled
         if self.show_constraints:
             self.draw_element_labels(widget, cr)
+
+        ### Restore context (undo zoom and pan transformations)
+        cr.restore()
 
     def on_button_press(self, widget, event):
 
@@ -404,14 +499,41 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
                 self.handle_add_constraint_events(event)
 
     def handle_select_events(self, event):
-        # Currently one constraint can be added at a time on the gui
+        # Convert screen coordinates to world coordinates
+        world_x, world_y = self.screen_to_world(event.x, event.y)
+
+        # Special handling for LINE_WITH_POINTS mode: allow selecting a point to close the chain
+        if self.drawing_method == DrawingMethod.LINE_WITH_POINTS:
+            # Only allow selecting a point if we have started a chain
+            if self.line_with_points_last_point is not None:
+                for shape in self.shape_manager.shape_buffer:
+                    # Only allow selecting visible points
+                    if not isinstance(shape, drawmodel.Point) or not shape.visible:
+                        continue
+                    if shape.is_hit_by_point(drawmodel.CanvasCoord(world_x, world_y)):
+                        # Store the closing point and highlight it
+                        if self.line_with_points_closing_point is not None:
+                            # Reset previous closing point color
+                            self.line_with_points_closing_point.colour = common.RgbColour(0.0, 0.0, 0.0)
+
+                        self.line_with_points_closing_point = shape
+                        shape.colour = common.RgbColour(0.0, 1.0, 0.0)  # Green for closing point
+                        self.queue_draw()
+                        print(f"Selected point for closing chain (next left-click will close)")
+                        break
+            return
+
+        # Normal constraint selection behavior for other modes
         if len(self.selected_items) < 2:
             for shape in self.shape_manager.shape_buffer:
                 # Skip invisible shapes (e.g., line defining points)
                 if not shape.visible:
                     continue
+                # Skip visual-only lines (they shouldn't be selectable for constraints)
+                if isinstance(shape, drawmodel.Line) and not shape.add_to_constraint_graph:
+                    continue
                 if shape.is_hit_by_point(
-                    drawmodel.CanvasCoord(event.x, event.y)
+                    drawmodel.CanvasCoord(world_x, world_y)
                 ):
                     # self.selected_items.append({shape, copy.deepcopy(shape.colour)})
                     self.selected_items.append(shape)
@@ -491,14 +613,20 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
     def add_shape_to_constraint_graph(self, shape):
         """Helper method to add a shape to the constraint graph"""
         if self.gcs_system is not None:
+            # Skip lines marked as visual-only (not to be added to constraint graph)
+            if isinstance(shape, drawmodel.Line) and not shape.add_to_constraint_graph:
+                return
             self.gcs_system.add_shape_as_node(shape)
 
     def handle_draw_events(self, event):
+        # Convert screen coordinates to world coordinates
+        world_x, world_y = self.screen_to_world(event.x, event.y)
+
         match self.drawing_method:
             case DrawingMethod.POINT:
                 new_point = drawmodel.Point(
-                    event.x,
-                    event.y,
+                    world_x,
+                    world_y,
                     self.current_width,
                     copy.deepcopy(self.current_colour),
                 )
@@ -512,8 +640,8 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
                 if not self.temp_start_point:
                     self.temp_start_point = True
                     new_point = drawmodel.Point(
-                        event.x,
-                        event.y,
+                        world_x,
+                        world_y,
                         self.current_width,
                         copy.deepcopy(self.current_colour),
                         visible=False,  # Hide line defining points
@@ -522,8 +650,8 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
                     # Don't add defining point to constraint graph
                 else:
                     end_point = drawmodel.Point(
-                        event.x,
-                        event.y,
+                        world_x,
+                        world_y,
                         copy.deepcopy(self.current_width),
                         copy.deepcopy(self.current_colour),
                         visible=False,  # Hide line defining points
@@ -545,46 +673,67 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
                 self.queue_draw()
 
             case DrawingMethod.LINE_WITH_POINTS:
-                if not self.temp_start_point:
-                    self.temp_start_point = True
+                # Check if we're in closing mode
+                if self.line_with_points_closing_point is not None:
+                    # Close the chain by connecting last point to closing point
+                    closing_line = drawmodel.Line(
+                        self.line_with_points_last_point,
+                        self.line_with_points_closing_point,
+                        copy.deepcopy(self.current_width),
+                        copy.deepcopy(self.current_colour),
+                        visible=True,
+                        add_to_constraint_graph=False  # Visual-only line
+                    )
+                    self.shape_manager.shape_buffer.append(closing_line)
+
+                    # Reset closing point color
+                    self.line_with_points_closing_point.colour = common.RgbColour(0.0, 0.0, 0.0)
+
+                    # Reset state to prepare for new chain
+                    self.line_with_points_last_point = None
+                    self.line_with_points_closing_point = None
+
+                    print("Chain closed. Next click will start a new chain.")
+                    self.queue_draw()
+                else:
+                    # Normal continuous point drawing mode
                     new_point = drawmodel.Point(
-                        event.x,
-                        event.y,
+                        world_x,
+                        world_y,
                         self.current_width,
                         copy.deepcopy(self.current_colour),
                         visible=True,  # Show points
                     )
-                    self.shape_manager.shape_buffer.append(new_point)
-                    # Add point to constraint graph
-                    self.add_shape_to_constraint_graph(new_point)
-                else:
-                    end_point = drawmodel.Point(
-                        event.x,
-                        event.y,
-                        copy.deepcopy(self.current_width),
-                        copy.deepcopy(self.current_colour),
-                        visible=True,  # Show points
-                    )
-                    new_line = drawmodel.Line(
-                        self.shape_manager.shape_buffer[-1],
-                        end_point,
-                        copy.deepcopy(self.current_width),
-                        copy.deepcopy(self.current_colour),
-                    )
-                    self.shape_manager.shape_buffer.append(new_line)
-                    self.shape_manager.shape_buffer.append(end_point)
 
-                    # Add only the end point to constraint graph (start point already added)
-                    self.add_shape_to_constraint_graph(end_point)
-                    # Don't add the line to constraint graph
+                    if self.line_with_points_last_point is None:
+                        # First point in the chain
+                        self.shape_manager.shape_buffer.append(new_point)
+                        self.add_shape_to_constraint_graph(new_point)
+                        self.line_with_points_last_point = new_point
+                    else:
+                        # Subsequent points - connect to previous point with a visual-only line
+                        connecting_line = drawmodel.Line(
+                            self.line_with_points_last_point,
+                            new_point,
+                            copy.deepcopy(self.current_width),
+                            copy.deepcopy(self.current_colour),
+                            visible=True,
+                            add_to_constraint_graph=False  # Visual-only line
+                        )
+                        self.shape_manager.shape_buffer.append(connecting_line)
+                        self.shape_manager.shape_buffer.append(new_point)
 
-                    self.temp_start_point = False
+                        # Add only the new point to constraint graph (not the line)
+                        self.add_shape_to_constraint_graph(new_point)
 
-                self.queue_draw()
+                        # Update last point to the new point for next iteration
+                        self.line_with_points_last_point = new_point
+
+                    self.queue_draw()
 
             case DrawingMethod.CIRCLE:
                 new_circle = drawmodel.Circle(
-                    drawmodel.CanvasCoord(event.x, event.y),
+                    drawmodel.CanvasCoord(world_x, world_y),
                     0.0,
                     self.current_width,
                     copy.deepcopy(self.current_colour),
@@ -592,21 +741,78 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
                 self.shape_manager.shape_buffer.append(new_circle)
 
     def on_motion_notify(self, widget, event):
+        # Convert screen coordinates to world coordinates
+        world_x, world_y = self.screen_to_world(event.x, event.y)
+
         match self.drawing_method:
             case DrawingMethod.CIRCLE:
                 self.set_circle_radius_and_draw(
-                    drawmodel.CanvasCoord(event.x, event.y)
+                    drawmodel.CanvasCoord(world_x, world_y)
                 )
+
+    def on_scroll(self, widget, event):
+        """Handle mouse scroll for zooming"""
+        # Determine zoom direction
+        zoom_factor = 1.1  # 10% zoom per scroll step
+
+        if event.direction == Gdk.ScrollDirection.UP:
+            # Zoom in
+            new_zoom = self.zoom_level * zoom_factor
+        elif event.direction == Gdk.ScrollDirection.DOWN:
+            # Zoom out
+            new_zoom = self.zoom_level / zoom_factor
+        elif event.direction == Gdk.ScrollDirection.SMOOTH:
+            # Smooth scrolling (touchpad)
+            success, delta_x, delta_y = event.get_scroll_deltas()
+            if success:
+                # delta_y < 0 means scroll up (zoom in), > 0 means scroll down (zoom out)
+                zoom_change = 1.0 - (delta_y * 0.05)  # 5% per delta unit
+                new_zoom = self.zoom_level * zoom_change
+            else:
+                return False
+        else:
+            return False
+
+        # Clamp zoom level
+        new_zoom = max(self.min_zoom, min(self.max_zoom, new_zoom))
+
+        if new_zoom == self.zoom_level:
+            return False  # No change
+
+        # Zoom to mouse cursor position
+        # Convert mouse position to world coordinates before zoom
+        mouse_x = event.x
+        mouse_y = event.y
+        world_x_before = (mouse_x - self.pan_offset_x) / self.zoom_level
+        world_y_before = (mouse_y - self.pan_offset_y) / self.zoom_level
+
+        # Update zoom
+        self.zoom_level = new_zoom
+
+        # Calculate new screen position of the same world point
+        screen_x_after = world_x_before * self.zoom_level + self.pan_offset_x
+        screen_y_after = world_y_before * self.zoom_level + self.pan_offset_y
+
+        # Adjust pan offset to keep the point under the mouse
+        self.pan_offset_x += mouse_x - screen_x_after
+        self.pan_offset_y += mouse_y - screen_y_after
+
+        # Trigger redraw
+        self.queue_draw()
+        return True
 
     def on_button_release(self, widget, event):
         if (
             event.type == Gdk.EventType.BUTTON_RELEASE
             and event.button == common.MouseButtonGtkId.LEFT_MOUSE_BUTTON
         ):
+            # Convert screen coordinates to world coordinates
+            world_x, world_y = self.screen_to_world(event.x, event.y)
+
             match self.drawing_method:
                 case DrawingMethod.CIRCLE:
                     self.set_circle_radius_and_draw(
-                        drawmodel.CanvasCoord(event.x, event.y)
+                        drawmodel.CanvasCoord(world_x, world_y)
                     )
                     # Circle is now complete, add to constraint graph
                     if len(self.shape_manager.shape_buffer) > 0:
@@ -629,6 +835,12 @@ class DrawingCanvasWidget(Gtk.DrawingArea):
 
     def set_drawing_method(self, stringRep: str):
         self.drawing_method = DrawingMethod.get_enum_based_on_str(stringRep)
+        # Reset continuous drawing state when changing modes
+        if self.line_with_points_closing_point is not None:
+            # Reset color of closing point if it was set
+            self.line_with_points_closing_point.colour = common.RgbColour(0.0, 0.0, 0.0)
+        self.line_with_points_last_point = None
+        self.line_with_points_closing_point = None
 
     def undo_last(self):
         if len(self.shape_manager.shape_buffer) != 0:
@@ -772,6 +984,24 @@ class DrawingLayout(Gtk.Grid):
         load_row.add(load_button)
 
         list_box.add(load_row)
+
+        # Add demo selector label
+        demo_label = Gtk.Label(label="Load Demo:")
+        demo_label.set_halign(Gtk.Align.START)
+        demo_label_row = Gtk.ListBoxRow()
+        demo_label_row.add(demo_label)
+        list_box.add(demo_label_row)
+
+        # Add demo selector ComboBox
+        self.demo_combo = Gtk.ComboBoxText()
+        self.demo_combo.set_entry_text_column(0)
+        self.demo_combo.connect("changed", self.on_demo_selected)
+        demo_combo_row = Gtk.ListBoxRow()
+        demo_combo_row.add(self.demo_combo)
+        list_box.add(demo_combo_row)
+
+        # Populate demo combo box with available demos
+        self.populate_demo_list()
 
         # Add constraint rendering toggle switch
         constraint_render_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
@@ -943,3 +1173,73 @@ class DrawingLayout(Gtk.Grid):
 
     def undo_last(self, button):
         self.drawing_area.undo_last()
+
+    def populate_demo_list(self):
+        """Populate the demo selector with JSON files from the demos folder"""
+        import os
+
+        # Get the project root and demos directory path
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
+        demos_dir = os.path.join(project_root, 'scripts/python_gui/demos')
+
+        # Clear existing items
+        self.demo_combo.remove_all()
+
+        # Add a placeholder option
+        self.demo_combo.append_text("-- Select a demo --")
+
+        # Check if demos directory exists
+        if not os.path.exists(demos_dir):
+            print(f"Demos directory not found: {demos_dir}")
+            self.demo_combo.set_active(0)
+            return
+
+        # Find all JSON files in the demos directory
+        try:
+            json_files = [f for f in os.listdir(demos_dir) if f.endswith('.json')]
+            json_files.sort()  # Sort alphabetically
+
+            if not json_files:
+                print(f"No JSON demo files found in {demos_dir}")
+            else:
+                for json_file in json_files:
+                    # Add the filename (without path) to the combo box
+                    self.demo_combo.append_text(json_file)
+                print(f"Found {len(json_files)} demo file(s)")
+
+        except Exception as e:
+            print(f"Error reading demos directory: {e}")
+
+        # Set the placeholder as active
+        self.demo_combo.set_active(0)
+
+    def on_demo_selected(self, combo):
+        """Handle demo selection from the combo box"""
+        import os
+
+        selected_demo = combo.get_active_text()
+
+        # Ignore the placeholder selection
+        if selected_demo is None or selected_demo == "-- Select a demo --":
+            return
+
+        # Get the full path to the demo file
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
+        demos_dir = os.path.join(project_root, 'scripts/python_gui/demos')
+        demo_path = os.path.join(demos_dir, selected_demo)
+
+        # Load the demo file
+        if self.drawing_area.gcs_system is not None:
+            print(f"Loading demo: {selected_demo}")
+            success = self.drawing_area.gcs_system.load_from_file(demo_path)
+            if success:
+                print(f"✓ Demo loaded successfully: {selected_demo}")
+                # Force redraw of the canvas
+                self.drawing_area.queue_draw()
+            else:
+                print(f"✗ Failed to load demo: {selected_demo}")
+        else:
+            print("✗ No GCS system available")
+
+        # Reset the combo box to placeholder
+        combo.set_active(0)
