@@ -58,3 +58,5 @@ examples/internal/*
 **/__pycache__/*
 
 local_node_dev_tools
+segfault_inputs/
+**/demos/*

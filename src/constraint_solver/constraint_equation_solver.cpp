@@ -102,8 +102,8 @@ namespace {
         using Dual2DColVector = Eigen::Matrix<dual, 2, 1>;
 
         std::array<Dual2DColVector, 2> possibleVariableValues {
-            (Dual2DColVector() << 1000, 1000).finished(),
-            (Dual2DColVector() << -1000, -1000).finished()
+            (Dual2DColVector() << 2000, 2000).finished(),
+            (Dual2DColVector() << -2000, -2000).finished()
         };
 
         std::array<Eigen::Vector2d, 2> solutions { Eigen::Vector2d(),
