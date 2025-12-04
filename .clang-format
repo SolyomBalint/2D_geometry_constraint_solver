@@ -1,4 +1,11 @@
 BasedOnStyle: WebKit
 IndentWidth: 4
-SortIncludes: false
 ColumnLimit: 80
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBraces: WebKit
+TabWidth: 4
+UseTab: Never
+PointerAlignment: Left
+SpaceAfterTemplateKeyword: true

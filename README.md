@@ -1,11 +1,24 @@
-# 2D Geometry Constraint Solver
+# 2D Geometric Constraint Solver
 
-This is an open-source university learning project. Several algorithms will be implemented that aim to solve geometry
-constraint problems in 2D. Due to the fact, that I develop this project for the purpose of learning it will have regular
-,huge refactors and unstable approaches. Also I plan minimal testing and no CI/CD system or any kind of releases.
+This project aims to implement a fully fledged 2D geometric constraint solver. The framework is developed as a
+university project at Budapest University of Technology and Economics (BME) Faculty of Electrical Engineering and
+Informatics (VIK) Department of Control Engineering and Information Technology.
 
-However, I'll try to keep to code clean and commented, also providing documentation. Feel free to use my code as a
-starting point for your own projects.
+## The Problem This Project Aims to Solve
+
+
+
+## Current State
+
+The project currently focuses on laying-down the foundation of a broader solver framework. At the moment, constraint
+graph based representation is used for the geometric constraint system (GCS). This data-structure dictates the
+implemented algorithms:
+
+ * **Top-down decomposition**: The constraint graph is decomposed using top-down method based on [Owen's](https://dl.acm.org/doi/10.1145/112515.112573) papers.
+ * **Newton-Raphson method based solver**: Once the GCS is decomposed into smaller quadratically solvable problems,
+   numerical iterative methods are used to identify the possible roots of the created equation systems.
+ * **Triangle orientation based heuristics**: The orientation of the canvas-drawn shapes is used to determine the
+ correct solution for the system
 
 ## License
 

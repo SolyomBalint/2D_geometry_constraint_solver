@@ -1,100 +1,64 @@
 CompileFlags:
-  Compiler: g++
-  Add: [-std=c++20, -pedantic-errors, -Wall, -Weffc++, -Wextra, -Wconversion, -Wsign-conversion, -Wpedantic]
-  # Remove any existing std flag that might conflict
-  Remove: [-std=c++11, -std=c++14, -std=c++17]
+  # Rely on compile_commands.json for the driver.
+  # If no build folder is found, these flags provide a safe fallback.
+  Add:
+    [
+      -std=c++20,
+      -Wall,
+      -Wextra,
+      -Wconversion,
+      -Wsign-conversion,
+      -Wshadow,
+      -Wnon-virtual-dtor,
+    ]
+  # Remove older standards to prevent conflicts
+  Remove:
+    [
+      -std=c++98,
+      -std=c++03,
+      -std=c++11,
+      -std=c++14,
+      -std=c++17,
+      -pedantic-errors,
+    ]
 
 Index:
-  # Enable background indexing for better performance
   Background: Build
   StandardLibrary: Yes
 
 Diagnostics:
-  ClangTidy:
-    Add: [
-      # Core checks
-      'bugprone-*',
-      'clang-analyzer-*',
-      'cppcoreguidelines-*',
-      'modernize-*',
-      'performance-*',
-      'readability-*',
-      
-      # Additional useful checks
-      'cert-*',
-      'concurrency-*',
-      'misc-*',
-      'portability-*',
-      
-      # Google style checks (good practices)
-      'google-*',
-      
-      # LLVM style checks
-      'llvm-*',
-    ]
-    Remove: [
-      # Disable some overly strict or problematic checks
-      'cppcoreguidelines-pro-bounds-pointer-arithmetic',
-      'cppcoreguidelines-pro-type-reinterpret-cast',
-      'cppcoreguidelines-pro-type-union-access',
-      'cppcoreguidelines-avoid-magic-numbers',
-      'readability-magic-numbers',
-      'modernize-use-trailing-return-type',
-      'google-readability-todo',
-      'llvm-header-guard',
-      'google-build-using-namespace',
-      'misc-non-private-member-variables-in-classes',
-      'readability-identifier-length'
-      
-      # Disable checks that might conflict with C++20 features
-      'modernize-use-nodiscard',  # Let C++20 attributes handle this
-      'readability-avoid-const-params-in-decls',  # Sometimes useful in C++20
-    ]
-    CheckOptions:
-      # Configure specific check options
-      readability-identifier-naming.ClassCase: CamelCase
-      readability-identifier-naming.FunctionCase: camelBack
-      readability-identifier-naming.VariableCase: camelBack
-      readability-identifier-naming.ConstantCase: UPPER_CASE
-      readability-identifier-naming.PrivateMemberSuffix: _
-      readability-identifier-naming.ProtectedMemberSuffix: _
-      
-      # Function size limits
-      # readability-function-size.LineThreshold: 100
-      # readability-function-size.StatementThreshold: 50
-      # readability-function-size.BranchThreshold: 20
-      
-      # Cognitive complexity
-      readability-function-cognitive-complexity.Threshold: 25
-      
-      # Magic numbers configuration
-      cppcoreguidelines-avoid-magic-numbers.IgnoredIntegerValues: '0;1;2;10;100'
-      cppcoreguidelines-avoid-magic-numbers.IgnoredFloatingPointValues: '0.0;1.0;-1.0'
-      
-      # Modern C++ recommendations
-      modernize-pass-by-value.IncludeStyle: google
-      modernize-use-override.IgnoreDestructors: true
-      modernize-loop-convert.MinConfidence: reasonable
-      modernize-use-auto.MinTypeNameLength: 2
-      
-      # Performance tuning
-      performance-unnecessary-value-param.IncludeStyle: google
-      performance-move-const-arg.CheckTriviallyCopyableMove: false
-
-  # General diagnostic settings
   UnusedIncludes: Strict
   MissingIncludes: Strict
-  
-  # Enable additional warnings
-  Suppress: []
-  
-  # Limit diagnostic output for better readability
-  Limit: 100
 
-  ShowMessageID: Yes
+  ClangTidy:
+    Add:
+      [
+        "bugprone-*",
+        "modernize-*",
+        "performance-*",
+        "misc-*",
+        "readability-*",
+        "cppcoreguidelines-*",
+      ]
+    Remove: [
+        # Formatting/Style checks (let clang-format handle style)
+        "readability-braces-around-statements",
+        "readability-identifier-length",
+        "modernize-use-trailing-return-type",
+        "modernize-use-nodiscard",
+
+        # Noise reduction (often false positives in standard code)
+        "cppcoreguidelines-pro-bounds-*",
+        "cppcoreguidelines-pro-type-*",
+        "cppcoreguidelines-avoid-magic-numbers",
+        "readability-magic-numbers",
+        "bugprone-easily-swappable-parameters",
+      ]
+    CheckOptions:
+      # High complexity functions are hard to maintain; this warns if logic is too deep
+      readability-function-cognitive-complexity.Threshold: 25
 
 InlayHints:
-  # Enable helpful inlay hints
   Enabled: Yes
   ParameterNames: Yes
   DeducedTypes: Yes
@@ -102,27 +66,7 @@ InlayHints:
   BlockEnd: Yes
 
 Hover:
-  # Show detailed hover information
   ShowAKA: Yes
 
 Completion:
-  # Code completion settings
   AllScopes: Yes
-  ArgumentLists: Yes
-  
-Format:
-  # Use WebKit style as base with additional settings
-  BasedOnStyle: WebKit
-  IndentWidth: 4
-  ColumnLimit: 120
-  AllowShortFunctionsOnASingleLine: Inline
-  AllowShortIfStatementsOnASingleLine: Never
-  AlwaysBreakTemplateDeclarations: Yes
-  BreakBeforeBraces: WebKit
-  TabWidth: 4
-  UseTab: Never
-  PointerAlignment: Left
-  SpaceAfterTemplateKeyword: true
-
-# CompileFlags:
-#   Add: [-I/nix/store/.../include]

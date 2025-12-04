@@ -10,9 +10,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS true)
 message(STATUS "Setting CMAKE_DEVENV_PROFILE to $ENV{DEVENV_PROFILE}")
 set(CMAKE_DEVENV_PROFILE $ENV{DEVENV_PROFILE})
 
-configure_file(${CMAKE_CURRENT_LIST_DIR}/pyproject.toml.template ${CMAKE_CURRENT_LIST_DIR}/pyproject.toml)
-
-
 find_package(spdlog REQUIRED)
 find_package(ogdf REQUIRED)
 find_package(stduuid REQUIRED)

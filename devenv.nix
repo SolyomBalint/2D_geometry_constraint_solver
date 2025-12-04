@@ -7,63 +7,30 @@
 }:
 let
   pkgs_unstable = import inputs.unstable_nixkpgs { system = pkgs.stdenv.system; };
+  gcc15Stdenv = pkgs_unstable.gcc15Stdenv;
 in
 {
   cachix.enable = true;
   cachix.pull = [ "pre-commit-hooks" ];
+
   # Environmental variables
   env.GREET = "Welcome to 2D geometry constraint solver development environment!";
   env.CONAN_HOME = "${config.devenv.root}/.conan2";
 
-  # env.DEVENV_GCC = "${pkgs_unstable.libgcc.out}/bin/gcc";
-  # env.DEVENV_GPP = "${pkgs_unstable.libgcc.out}/bin/g++";
-
-  scripts.build_linux_gcc_debug.exec = ''
-    echo "If the script fails on nixos run it in an fhs shell"
-    conan install $DEVENV_ROOT --remote=conancenter --build=missing \
-    -pr $DEVENV_ROOT/conan_profiles/Linux/LinuxGccStd20DebugProfile
-
-    cmake -B $DEVENV_ROOT/build/Debug -S $DEVENV_ROOT \
-    -DCMAKE_TOOLCHAIN_FILE=$DEVENV_ROOT/build/Debug/generators/conan_toolchain.cmake \
-    -DCMAKE_BUILD_TYPE=Debug
-
-    # This is a horrible hack, for the lack of correct clangd configuration
-    cp $DEVENV_ROOT/build/Debug/compile_commands.json $DEVENV_ROOT/build
-
-    cmake --build $DEVENV_ROOT/build/Debug
-  '';
-
-  scripts.build_linux_gcc_release.exec = ''
-    echo "If the script fails on nixos run it in an fhs shell"
-    conan install $DEVENV_ROOT --remote=conancenter --build=missing \
-    -pr $DEVENV_ROOT/conan_profiles/Linux/LinuxGccStd20ReleaseProfile
-
-    cmake -B $DEVENV_ROOT/build/Release -S $DEVENV_ROOT \
-    -DCMAKE_TOOLCHAIN_FILE=$DEVENV_ROOT/build/Release/generators/conan_toolchain.cmake \
-    -DCMAKE_BUILD_TYPE=Release
-
-    # This is a horrible hack, for the lack of correct clangd configuration
-    cp $DEVENV_ROOT/build/Release/compile_commands.json $DEVENV_ROOT/build
-
-    cmake --build $DEVENV_ROOT/build/Release
-  '';
-
   # packages
   packages = with pkgs_unstable; [
     ## Build tools
-    libgcc
-    gcc15
+    gcc15Stdenv.cc
     gnumake
-    cmake
-    llvmPackages_latest.clang-tools
-    llvmPackages_latest.clangNoCompilerRtWithLibc # in the local environemnt the goal is to be able to use both compilers
-    # for checking for mistakes, so we leave out the LLVM cpp libs to avoid linking issues
-    gdb
     ninja
+    cmake
+    clang-tools
+    clang
     pkg-config
 
     ## Tools
     doxygen
+    gdb
     valgrind
     virtualglLib
     sass
@@ -99,6 +66,9 @@ in
     };
   };
   enterShell = ''
+    export CC=clang
+    export CXX=clang++
+
     echo ""
     echo "██████╗ ███╗   ███╗███████╗    ██╗██╗████████╗"
     echo "██╔══██╗████╗ ████║██╔════╝    ██║██║╚══██╔══╝"

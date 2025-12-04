@@ -2,8 +2,8 @@
 os=Linux
 arch=x86_64
 compiler=clang
-compiler.cppstd=gnu20
-compiler.version=20
+compiler.cppstd=gnu23
+compiler.version=21
 compiler.libcxx=libstdc++11
 build_type=Debug
 
