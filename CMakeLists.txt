@@ -2,9 +2,6 @@ cmake_minimum_required(VERSION 4.1)
 
 project(2d_geometry_constraint_solver)
 
-set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard" FORCE)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
 
 message(STATUS "Setting CMAKE_DEVENV_PROFILE to $ENV{DEVENV_PROFILE}")
