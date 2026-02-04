@@ -1,10 +1,11 @@
 #ifndef SEPARATION_PAIRS_HPP
 #define SEPARATION_PAIRS_HPP
 
-#include "graph.hpp"
-#include "graph_algorithms.hpp"
+#include <structures/graph.hpp>
+#include <structures/graph_algorithms.hpp>
 
 #include <algorithm>
+#include <cassert>
 #include <expected>
 #include <numeric>
 #include <ranges>
@@ -46,6 +47,7 @@ struct SeparationPair {
 enum class SeparationPairsError {
     NotBiconnected, ///< The input graph is not biconnected.
     HasSelfLoops, ///< The input graph contains self-loops.
+    NoPairsFound, ///< The graph has no separation pairs.
 };
 
 /// @cond INTERNAL
@@ -118,9 +120,13 @@ namespace detail {
         /**
          * @brief Construct a finder for the given graph.
          * @param graph The biconnected graph to analyse.
+         * @param stopAfterFirst If @c true, the algorithm terminates as
+         *        soon as the first separation pair is found.
          */
-        explicit SeparationPairsFinder(const G& graph)
+        explicit SeparationPairsFinder(
+            const G& graph, bool stopAfterFirst = false)
             : m_graph(graph)
+            , m_stopAfterFirst(stopAfterFirst)
         {
         }
 
@@ -163,6 +169,10 @@ namespace detail {
             if (m_n < 4)
                 return convertResults();
 
+            // Early exit: a Type-3 pair was already found
+            if (m_foundFirst)
+                return convertResults();
+
             // Phase 2: Initial DFS — build palm tree
             initialDFS();
 
@@ -191,6 +201,12 @@ namespace detail {
 
     private:
         const G& m_graph; ///< Reference to the input graph.
+        bool m_stopAfterFirst {
+            false
+        }; ///< If true, stop after the first pair is found.
+        bool m_foundFirst {
+            false
+        }; ///< Set to true when the first pair is recorded.
 
         /// @name Node mapping
         /// @{
@@ -307,8 +323,14 @@ namespace detail {
             for (const auto& edgeId : m_graph.getEdges()) {
                 auto [s, t] = m_graph.getEndpoints(edgeId);
 
-                int si = m_nodeToIndex.at(s);
-                int ti = m_nodeToIndex.at(t);
+                auto siIt = m_nodeToIndex.find(s);
+                auto tiIt = m_nodeToIndex.find(t);
+                assert(siIt != m_nodeToIndex.end()
+                    && "buildInternalGraph: node not in index map");
+                assert(tiIt != m_nodeToIndex.end()
+                    && "buildInternalGraph: node not in index map");
+                int si = siIt->second;
+                int ti = tiIt->second;
 
                 InternalEdge ie;
                 ie.id = edgeCounter;
@@ -349,6 +371,11 @@ namespace detail {
                     int lo = static_cast<int>(key / (m_n + 1));
                     m_multipleEdgeResults.push_back({ m_indexToNode[sz(lo)],
                         m_indexToNode[sz(hi)], SeparationPairType::Type3 });
+
+                    if (m_stopAfterFirst) {
+                        m_foundFirst = true;
+                        return;
+                    }
                 }
             }
         }
@@ -972,6 +999,9 @@ namespace detail {
         void pathSearch(int v)
         {
             for (int eidx : m_adj[sz(v)]) {
+                if (m_foundFirst)
+                    return;
+
                 auto& edge = m_edges[sz(eidx)];
 
                 if (edge.isTreeArc && edge.source == v) {
@@ -1238,6 +1268,9 @@ namespace detail {
             int lo = std::min(a, b);
             int hi = std::max(a, b);
             m_internalResults.push_back({ lo, hi, type });
+
+            if (m_stopAfterFirst)
+                m_foundFirst = true;
         }
 
         /**
@@ -1310,6 +1343,38 @@ findSeparationPairs(const G& graph)
 {
     detail::SeparationPairsFinder<G> finder(graph);
     return finder.run();
+}
+
+/**
+ * @brief Find the first separation pair in a biconnected graph.
+ *
+ * Uses the same Hopcroft-Tarjan / Gutwenger-Mutzel algorithm as
+ * @ref findSeparationPairs, but terminates as soon as the first
+ * separation pair is detected.
+ *
+ * @tparam G A type satisfying the GraphBase concept.
+ * @param graph The input graph (must be biconnected and free of self-loops).
+ * @return On success, the first SeparationPair found. On failure, a
+ *         SeparationPairsError indicating the reason (including
+ *         @c NoPairsFound when the graph has no separation pairs).
+ *
+ * @par Complexity
+ * O(V + E) time and space (may terminate earlier in practice).
+ */
+template <GraphBase G>
+std::expected<SeparationPair<typename G::NodeIdType>, SeparationPairsError>
+findFirstSeparationPair(const G& graph)
+{
+    detail::SeparationPairsFinder<G> finder(graph, true);
+    auto result = finder.run();
+
+    if (!result.has_value())
+        return std::unexpected(result.error());
+
+    if (result->empty())
+        return std::unexpected(SeparationPairsError::NoPairsFound);
+
+    return result->front();
 }
 
 /**

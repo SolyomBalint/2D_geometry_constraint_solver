@@ -3,7 +3,7 @@ CompileFlags:
   # If no build folder is found, these flags provide a safe fallback.
   Add:
     [
-      -std=c++20,
+      -std=c++23,
       -Wall,
       -Wextra,
       -Wconversion,
@@ -19,6 +19,7 @@ CompileFlags:
       -std=c++11,
       -std=c++14,
       -std=c++17,
+      -std=c++20,
       -pedantic-errors,
     ]
 
@@ -53,10 +54,42 @@ Diagnostics:
         "cppcoreguidelines-avoid-magic-numbers",
         "readability-magic-numbers",
         "bugprone-easily-swappable-parameters",
+        "performance-enum-size",
+        "misc-non-private-member-variables-in-classes",
       ]
     CheckOptions:
       # High complexity functions are hard to maintain; this warns if logic is too deep
       readability-function-cognitive-complexity.Threshold: 25
+
+      # === Naming Convention Enforcement ===
+      # General naming
+      readability-identifier-naming.NamespaceCase: CamelCase
+      readability-identifier-naming.ClassCase: CamelCase
+      readability-identifier-naming.StructCase: CamelCase
+      readability-identifier-naming.FunctionCase: camelBack
+      readability-identifier-naming.ParameterCase: camelBack
+      readability-identifier-naming.LocalVariableCase: camelBack
+
+      # Class member variables
+      readability-identifier-naming.PrivateMemberCase: camelBack
+      readability-identifier-naming.PrivateMemberPrefix: m_
+      readability-identifier-naming.ProtectedMemberCase: camelBack
+      readability-identifier-naming.ProtectedMemberPrefix: p_
+      readability-identifier-naming.PublicMemberCase: camelBack
+
+      # Static members
+      readability-identifier-naming.ClassMemberCase: camelBack
+      readability-identifier-naming.ClassMemberPrefix: s_
+      readability-identifier-naming.StaticVariableCase: camelBack
+      readability-identifier-naming.StaticVariablePrefix: s_
+
+      # Constants
+      readability-identifier-naming.GlobalConstantCase: UPPER_CASE
+      readability-identifier-naming.ConstexprVariableCase: UPPER_CASE
+      readability-identifier-naming.StaticConstantCase: camelBack
+      readability-identifier-naming.StaticConstantPrefix: s_
+      readability-identifier-naming.ClassConstantCase: camelBack
+      readability-identifier-naming.ClassConstantPrefix: s_
 
 InlayHints:
   Enabled: Yes

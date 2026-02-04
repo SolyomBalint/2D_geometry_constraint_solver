@@ -1,12 +1,15 @@
 #ifndef GRAPH_ALGORITHMS_HPP
 #define GRAPH_ALGORITHMS_HPP
 
-#include "graph.hpp"
+#include <span>
+#include <structures/graph.hpp>
 
 #include <algorithm>
 #include <cstddef>
 #include <ranges>
+#include <stack>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace MathUtils {
@@ -188,6 +191,49 @@ std::vector<typename G::NodeIdType> findCutVertices(const G& graph)
     return result;
 }
 
+template <GraphBase G>
+std::vector<std::unordered_set<typename G::NodeIdType>>
+getSplitNodeSetsWithDuplicatedSeparators(const G& graph,
+    const std::span<const typename G::NodeIdType>& separationNodes)
+{
+    using Node = typename G::NodeIdType;
+
+    std::unordered_set<Node> separators(
+        separationNodes.begin(), separationNodes.end());
+    std::unordered_set<Node> globalVisited;
+    std::vector<std::unordered_set<Node>> splitSets;
+
+    for (const auto& startNode : graph.getNodes()) {
+        // Skip if it's a separator or already processed
+        if (separators.contains(startNode)
+            || globalVisited.contains(startNode)) {
+            continue;
+        }
+
+        std::unordered_set<Node> component;
+        std::vector<Node> stack = { startNode };
+        globalVisited.insert(startNode);
+
+        while (!stack.empty()) {
+            Node curr = stack.back();
+            stack.pop_back();
+            component.insert(curr);
+
+            for (Node neighbor : graph.getNeighbors(curr)) {
+                if (separators.contains(neighbor)) {
+                    // Add separator to component but don't traverse through it
+                    component.insert(neighbor);
+
+                } else if (!globalVisited.contains(neighbor)) {
+                    globalVisited.insert(neighbor);
+                    stack.push_back(neighbor);
+                }
+            }
+        }
+        splitSets.push_back(std::move(component));
+    }
+    return splitSets;
+}
 } // namespace MathUtils
 
 #endif // GRAPH_ALGORITHMS_HPP

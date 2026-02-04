@@ -1,9 +1,16 @@
 #ifndef SIMPLE_GRAPH_HPP
 #define SIMPLE_GRAPH_HPP
 
-#include "graph.hpp"
+// Custom headers
+#include <structures/graph.hpp>
+#include <structures/graph_errors.hpp>
 
+// General STD/STL headers
 #include <algorithm>
+#include <cassert>
+#include <compare>
+#include <cstddef>
+#include <expected>
 #include <functional>
 #include <ranges>
 #include <unordered_map>
@@ -17,12 +24,14 @@ struct NodeId {
     int value {};
 
     bool operator==(const NodeId&) const = default;
+    auto operator<=>(const NodeId&) const = default;
 };
 
 struct EdgeId {
     int value {};
 
     bool operator==(const EdgeId&) const = default;
+    auto operator<=>(const EdgeId&) const = default;
 };
 
 } // namespace MathUtils
@@ -64,13 +73,12 @@ public:
 
     auto getEdges() const { return std::views::keys(m_edgeEndpoints); }
 
+    /// @pre @p n must be a valid node in this graph.
     const std::unordered_set<EdgeId>& getEdges(NodeId n) const
     {
-        static const std::unordered_set<EdgeId> empty {};
         auto it = m_adjacency.find(n);
-        if (it != m_adjacency.end())
-            return it->second;
-        return empty;
+        assert(it != m_adjacency.end() && "getEdges: invalid NodeId");
+        return it->second;
     }
 
     auto getNeighbors(NodeId n) const
@@ -81,9 +89,12 @@ public:
         });
     }
 
+    /// @pre @p e must be a valid edge in this graph.
     std::pair<NodeId, NodeId> getEndpoints(EdgeId e) const
     {
-        return m_edgeEndpoints.at(e);
+        auto it = m_edgeEndpoints.find(e);
+        assert(it != m_edgeEndpoints.end() && "getEndpoints: invalid EdgeId");
+        return it->second;
     }
 
     NodeId addNode()
@@ -93,8 +104,11 @@ public:
         return id;
     }
 
-    EdgeId addEdge(NodeId s, NodeId t)
+    std::expected<EdgeId, GraphError> addEdge(NodeId s, NodeId t)
     {
+        if (!hasNode(s) || !hasNode(t))
+            return std::unexpected(GraphError::NodeNotFound);
+
         EdgeId id { m_nextEdgeId++ };
         m_edgeEndpoints[id] = { s, t };
         m_adjacency[s].insert(id);
@@ -102,11 +116,11 @@ public:
         return id;
     }
 
-    void removeNode(NodeId n)
+    std::expected<void, GraphError> removeNode(NodeId n)
     {
         auto it = m_adjacency.find(n);
         if (it == m_adjacency.end())
-            return;
+            return std::unexpected(GraphError::NodeNotFound);
 
         auto incidentEdges
             = std::vector<EdgeId>(it->second.begin(), it->second.end());
@@ -115,18 +129,20 @@ public:
             removeEdge(e);
 
         m_adjacency.erase(n);
+        return {};
     }
 
-    void removeEdge(EdgeId e)
+    std::expected<void, GraphError> removeEdge(EdgeId e)
     {
         auto it = m_edgeEndpoints.find(e);
         if (it == m_edgeEndpoints.end())
-            return;
+            return std::unexpected(GraphError::EdgeNotFound);
 
         auto [s, t] = it->second;
         m_adjacency[s].erase(e);
         m_adjacency[t].erase(e);
         m_edgeEndpoints.erase(it);
+        return {};
     }
 
     std::size_t nodeCount() const { return m_adjacency.size(); }
@@ -134,6 +150,34 @@ public:
 
     bool hasNode(NodeId n) const { return m_adjacency.contains(n); }
     bool hasEdge(EdgeId e) const { return m_edgeEndpoints.contains(e); }
+
+    bool hasEdgeBetween(NodeId s, NodeId t) const
+    {
+        auto itS = m_adjacency.find(s);
+        if (itS == m_adjacency.end() || !m_adjacency.contains(t))
+            return false;
+
+        for (const auto& e : itS->second) {
+            auto [a, b] = m_edgeEndpoints.at(e);
+            if ((a == s && b == t) || (a == t && b == s))
+                return true;
+        }
+        return false;
+    }
+
+    std::expected<EdgeId, GraphError> getEdgeBetween(NodeId s, NodeId t) const
+    {
+        auto itS = m_adjacency.find(s);
+        if (itS == m_adjacency.end() || !m_adjacency.contains(t))
+            return std::unexpected(GraphError::EdgeNotFound);
+
+        for (const auto& e : itS->second) {
+            auto [a, b] = m_edgeEndpoints.at(e);
+            if ((a == s && b == t) || (a == t && b == s))
+                return e;
+        }
+        return std::unexpected(GraphError::EdgeNotFound);
+    }
 
 private:
     int m_nextNodeId { 0 };

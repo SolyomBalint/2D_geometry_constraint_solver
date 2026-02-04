@@ -32,6 +32,11 @@ in
     doxygen
     gdb
     valgrind
+
+    ## GUI dependencies
+    gtk4
+    gtkmm4
+    pkg-config
   ];
 
   languages.python = {

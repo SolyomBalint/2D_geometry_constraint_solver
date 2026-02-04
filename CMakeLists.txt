@@ -2,20 +2,19 @@ cmake_minimum_required(VERSION 4.1)
 
 project(2d_geometry_constraint_solver)
 
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
 
 message(STATUS "Setting CMAKE_DEVENV_PROFILE to $ENV{DEVENV_PROFILE}")
 set(CMAKE_DEVENV_PROFILE $ENV{DEVENV_PROFILE})
 
-find_package(spdlog REQUIRED)
-find_package(ogdf REQUIRED)
-find_package(stduuid REQUIRED)
-find_package(argparse REQUIRED)
-find_package(Eigen3 REQUIRED)
-find_package(nlohmann_json REQUIRED)
-find_package(Python COMPONENTS Development Interpreter REQUIRED)
+######################## Conan-provided dependencies ########################
 
-######################## Downloading packages that are currently not available ########################
+find_package(spdlog REQUIRED)
+find_package(Eigen3 REQUIRED)
+
+######################## FetchContent dependencies ########################
 
 include(FetchContent)
 
@@ -33,42 +32,31 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(autodiff)
 
-######################## Downloading packages that are currently not available ########################
+######################## Sub-projects ########################
 
+add_subdirectory(src/structures)
+add_subdirectory(src/constraint_solver)
+add_subdirectory(gui)
 
-# IMPORTANT NOTE: Currently this project outputs only one binary. There is no
-# modularization in respect to the logical modules via archives or shared
-# libraries. DO NOT expect source file to work by themselves without the
-# correct linking
+######################## Main executable ########################
 
-add_executable(${PROJECT_NAME}  src/main.cpp
-                                src/constraint_solver/constraint_equation_solver.cpp
-                                src/constraint_solver/geometric_constraint_system.cpp
-                                src/constraint_solver/elements.cpp
-                                src/constraint_solver/constraints.cpp
-                                src/constraint_solver/json_constraint_graph_loader.cpp
-                                src/common/common/common_uuid.cpp)
+add_executable(${PROJECT_NAME} src/main.cpp)
 
-target_include_directories(${PROJECT_NAME} PRIVATE ./include
-            src/common
-            src/utils
-            ${spdlog_INCLUDE_DIRS}
-            ${ogdf_INCLUDE_DIRS}
-            ${argparse_INCLUDE_DIRS}
-            ${stduuid_INCLUDE_DIRS}
-            ${autodiff_INCLUDE_DIRS}
-            ${Eigen3_INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME} PRIVATE src)
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE SPDLOG_USE_STD_FORMAT LIBUUID_CPP20_OR_GREATER)
-target_link_libraries(${PROJECT_NAME} PRIVATE   stduuid::stduuid argparse::argparse ogdf::ogdf
-                                                spdlog::spdlog autodiff::autodiff Eigen3::Eigen nlohmann_json::nlohmann_json)
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    constraint_solver
+    spdlog::spdlog
+    autodiff::autodiff
+    Eigen3::Eigen)
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE SPDLOG_USE_STD_FORMAT)
 
 # Explanation why these flags are used:
 # -ggdb: if debugging use it for full support of gdb
 # -pedantic-errors: only support standard c++ features
-# The rest turns on several useful warnings, the `Weffc++` flag turns on checks
-# coming from Scott Meyers series
+# The rest turns on several useful warnings
 # TODO: make sure that the flags are correct for different compilers such as gcc and clang
-target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:-ggdb>
--pedantic-errors -Wall -Wextra -Wconversion -Wsign-conversion)
-
+target_compile_options(${PROJECT_NAME} PRIVATE
+    $<$<CONFIG:Debug>:-ggdb>
+    -pedantic-errors -Wall -Wextra -Wconversion -Wsign-conversion)

@@ -1,14 +1,20 @@
 #ifndef GRAPH_HPP
 #define GRAPH_HPP
 
+// General STD/STL headers
+#include <cassert>
 #include <concepts>
+#include <cstddef>
+#include <expected>
 #include <functional>
-#include <optional>
 #include <ranges>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+
+// Custom headers
+#include <structures/graph_errors.hpp>
 
 namespace MathUtils {
 
@@ -28,14 +34,16 @@ concept BindableTo = requires {
 // ============================================================
 
 template <typename N>
-concept NodeIdentity = std::regular<N> && requires(N n) {
-    { std::hash<N> {}(n) } -> std::convertible_to<std::size_t>;
-};
+concept NodeIdentity
+    = std::regular<N> && std::totally_ordered<N> && requires(N n) {
+          { std::hash<N> {}(n) } -> std::convertible_to<std::size_t>;
+      };
 
 template <typename E>
-concept EdgeIdentity = std::regular<E> && requires(E e) {
-    { std::hash<E> {}(e) } -> std::convertible_to<std::size_t>;
-};
+concept EdgeIdentity
+    = std::regular<E> && std::totally_ordered<E> && requires(E e) {
+          { std::hash<E> {}(e) } -> std::convertible_to<std::size_t>;
+      };
 
 // ============================================================
 // Graph concepts
@@ -44,7 +52,7 @@ concept EdgeIdentity = std::regular<E> && requires(E e) {
 template <typename G>
 concept GraphBase = NodeIdentity<typename G::NodeIdType>
     && EdgeIdentity<typename G::EdgeIdType>
-    && requires(G g, typename G::NodeIdType n, typename G::EdgeIdType e) {
+    && requires(const G g, typename G::NodeIdType n, typename G::EdgeIdType e) {
            requires(
                !std::same_as<typename G::NodeIdType, typename G::EdgeIdType>);
 
@@ -53,15 +61,25 @@ concept GraphBase = NodeIdentity<typename G::NodeIdType>
            { g.getEdges(n) } -> std::ranges::range;
            { g.getNeighbors(n) } -> std::ranges::range;
            { g.getEndpoints(e) } -> BindableTo<2>;
+           { g.hasNode(n) } -> std::same_as<bool>;
+           { g.hasEdge(e) } -> std::same_as<bool>;
+           { g.hasEdgeBetween(n, n) } -> std::same_as<bool>;
+           {
+               g.getEdgeBetween(n, n)
+           } -> std::same_as<std::expected<typename G::EdgeIdType, GraphError>>;
+           { g.nodeCount() } -> std::same_as<std::size_t>;
+           { g.edgeCount() } -> std::same_as<std::size_t>;
        };
 
 template <typename G>
 concept GraphTopology = GraphBase<G>
     && requires(G g, typename G::NodeIdType n, typename G::EdgeIdType e) {
            { g.addNode() } -> std::same_as<typename G::NodeIdType>;
-           { g.addEdge(n, n) } -> std::same_as<typename G::EdgeIdType>;
-           { g.removeNode(n) };
-           { g.removeEdge(e) };
+           {
+               g.addEdge(n, n)
+           } -> std::same_as<std::expected<typename G::EdgeIdType, GraphError>>;
+           { g.removeNode(n) } -> std::same_as<std::expected<void, GraphError>>;
+           { g.removeEdge(e) } -> std::same_as<std::expected<void, GraphError>>;
        };
 
 // ============================================================
@@ -170,6 +188,37 @@ public:
         return m_parentGraph->getEndpoints(e);
     }
 
+    bool hasNode(NodeIdType n) const { return m_nodeSubset.contains(n); }
+
+    bool hasEdge(EdgeIdType e) const
+    {
+        if (!m_parentGraph->hasEdge(e))
+            return false;
+        auto [s, t] = m_parentGraph->getEndpoints(e);
+        return m_nodeSubset.contains(s) && m_nodeSubset.contains(t);
+    }
+
+    bool hasEdgeBetween(NodeIdType s, NodeIdType t) const
+    {
+        return m_nodeSubset.contains(s) && m_nodeSubset.contains(t)
+            && m_parentGraph->hasEdgeBetween(s, t);
+    }
+
+    std::expected<EdgeIdType, GraphError> getEdgeBetween(
+        NodeIdType s, NodeIdType t) const
+    {
+        if (!m_nodeSubset.contains(s) || !m_nodeSubset.contains(t))
+            return std::unexpected(GraphError::EdgeNotFound);
+        return m_parentGraph->getEdgeBetween(s, t);
+    }
+
+    std::size_t nodeCount() const { return m_nodeSubset.size(); }
+
+    std::size_t edgeCount() const
+    {
+        return static_cast<std::size_t>(std::ranges::distance(getEdges()));
+    }
+
 private:
     const G* m_parentGraph;
     std::unordered_set<NodeIdType> m_nodeSubset;
@@ -227,6 +276,37 @@ public:
         return m_parentGraph->getEndpoints(e);
     }
 
+    bool hasNode(NodeIdType n) const { return m_nodeSubset.contains(n); }
+
+    bool hasEdge(EdgeIdType e) const
+    {
+        if (!m_parentGraph->hasEdge(e))
+            return false;
+        auto [s, t] = m_parentGraph->getEndpoints(e);
+        return m_nodeSubset.contains(s) && m_nodeSubset.contains(t);
+    }
+
+    bool hasEdgeBetween(NodeIdType s, NodeIdType t) const
+    {
+        return m_nodeSubset.contains(s) && m_nodeSubset.contains(t)
+            && m_parentGraph->hasEdgeBetween(s, t);
+    }
+
+    std::expected<EdgeIdType, GraphError> getEdgeBetween(
+        NodeIdType s, NodeIdType t) const
+    {
+        if (!m_nodeSubset.contains(s) || !m_nodeSubset.contains(t))
+            return std::unexpected(GraphError::EdgeNotFound);
+        return m_parentGraph->getEdgeBetween(s, t);
+    }
+
+    std::size_t nodeCount() const { return m_nodeSubset.size(); }
+
+    std::size_t edgeCount() const
+    {
+        return static_cast<std::size_t>(std::ranges::distance(getEdges()));
+    }
+
     NodeIdType addNode()
     {
         auto n = m_parentGraph->addNode();
@@ -234,18 +314,23 @@ public:
         return n;
     }
 
-    EdgeIdType addEdge(NodeIdType s, NodeIdType t)
+    std::expected<EdgeIdType, GraphError> addEdge(NodeIdType s, NodeIdType t)
     {
         return m_parentGraph->addEdge(s, t);
     }
 
-    void removeNode(NodeIdType n)
+    std::expected<void, GraphError> removeNode(NodeIdType n)
     {
-        m_parentGraph->removeNode(n);
-        m_nodeSubset.erase(n);
+        auto result = m_parentGraph->removeNode(n);
+        if (result)
+            m_nodeSubset.erase(n);
+        return result;
     }
 
-    void removeEdge(EdgeIdType e) { m_parentGraph->removeEdge(e); }
+    std::expected<void, GraphError> removeEdge(EdgeIdType e)
+    {
+        return m_parentGraph->removeEdge(e);
+    }
 
 private:
     G* m_parentGraph;
@@ -269,16 +354,28 @@ public:
 
         for (const auto& origNode : subset) {
             auto localNode = sub.m_graph.addNode();
+
             sub.m_originalToLocalNode[origNode] = localNode;
             sub.m_localToOriginalNode[localNode] = origNode;
         }
 
         for (const auto& origEdge : parent.getEdges()) {
             auto [s, t] = parent.getEndpoints(origEdge);
+
             if (subset.contains(s) && subset.contains(t)) {
+                auto localS = sub.m_originalToLocalNode.find(s);
+                auto localT = sub.m_originalToLocalNode.find(t);
+
+                assert(localS != sub.m_originalToLocalNode.end()
+                    && "SubGraph::extract: node mapping invariant violated");
+                assert(localT != sub.m_originalToLocalNode.end()
+                    && "SubGraph::extract: node mapping invariant violated");
+
+                // Nodes were just added above; addEdge must succeed.
                 auto localEdge
-                    = sub.m_graph.addEdge(sub.m_originalToLocalNode.at(s),
-                        sub.m_originalToLocalNode.at(t));
+                    = sub.m_graph.addEdge(localS->second, localT->second)
+                          .value();
+
                 sub.m_originalToLocalEdge[origEdge] = localEdge;
                 sub.m_localToOriginalEdge[localEdge] = origEdge;
             }
@@ -296,65 +393,96 @@ public:
 
     auto getEndpoints(EdgeIdType e) const { return m_graph.getEndpoints(e); }
 
+    bool hasNode(NodeIdType n) const { return m_graph.hasNode(n); }
+    bool hasEdge(EdgeIdType e) const { return m_graph.hasEdge(e); }
+
+    bool hasEdgeBetween(NodeIdType s, NodeIdType t) const
+    {
+        return m_graph.hasEdgeBetween(s, t);
+    }
+
+    std::expected<EdgeIdType, GraphError> getEdgeBetween(
+        NodeIdType s, NodeIdType t) const
+    {
+        return m_graph.getEdgeBetween(s, t);
+    }
+
+    std::size_t nodeCount() const { return m_graph.nodeCount(); }
+    std::size_t edgeCount() const { return m_graph.edgeCount(); }
+
     NodeIdType addNode() { return m_graph.addNode(); }
 
-    EdgeIdType addEdge(NodeIdType s, NodeIdType t)
+    std::expected<EdgeIdType, GraphError> addEdge(NodeIdType s, NodeIdType t)
     {
         return m_graph.addEdge(s, t);
     }
 
-    void removeNode(NodeIdType n)
+    std::expected<void, GraphError> removeNode(NodeIdType n)
     {
-        if (auto it = m_localToOriginalNode.find(n);
-            it != m_localToOriginalNode.end()) {
-            m_originalToLocalNode.erase(it->second);
-            m_localToOriginalNode.erase(it);
+        auto result = m_graph.removeNode(n);
+
+        if (result) {
+            if (auto it = m_localToOriginalNode.find(n);
+                it != m_localToOriginalNode.end()) {
+                m_originalToLocalNode.erase(it->second);
+                m_localToOriginalNode.erase(it);
+            }
         }
-        m_graph.removeNode(n);
+        return result;
     }
 
-    void removeEdge(EdgeIdType e)
+    std::expected<void, GraphError> removeEdge(EdgeIdType e)
     {
-        if (auto it = m_localToOriginalEdge.find(e);
-            it != m_localToOriginalEdge.end()) {
-            m_originalToLocalEdge.erase(it->second);
-            m_localToOriginalEdge.erase(it);
+        auto result = m_graph.removeEdge(e);
+
+        if (result) {
+            if (auto it = m_localToOriginalEdge.find(e);
+                it != m_localToOriginalEdge.end()) {
+                m_originalToLocalEdge.erase(it->second);
+                m_localToOriginalEdge.erase(it);
+            }
         }
-        m_graph.removeEdge(e);
+        return result;
     }
 
-    // TODO: Note that these could use the new C++23 API, but we would require
-    // valid error codes for that
-    std::optional<NodeIdType> originalNodeId(NodeIdType local) const
+    std::expected<NodeIdType, SubGraphMappingError> originalNodeId(
+        NodeIdType local) const
     {
         auto it = m_localToOriginalNode.find(local);
+
         if (it != m_localToOriginalNode.end())
             return it->second;
-        return std::nullopt;
+        return std::unexpected(SubGraphMappingError::NodeMappingNotFound);
     }
 
-    std::optional<NodeIdType> localNodeId(NodeIdType original) const
+    std::expected<NodeIdType, SubGraphMappingError> localNodeId(
+        NodeIdType original) const
     {
         auto it = m_originalToLocalNode.find(original);
+
         if (it != m_originalToLocalNode.end())
             return it->second;
-        return std::nullopt;
+        return std::unexpected(SubGraphMappingError::NodeMappingNotFound);
     }
 
-    std::optional<EdgeIdType> originalEdgeId(EdgeIdType local) const
+    std::expected<EdgeIdType, SubGraphMappingError> originalEdgeId(
+        EdgeIdType local) const
     {
         auto it = m_localToOriginalEdge.find(local);
+
         if (it != m_localToOriginalEdge.end())
             return it->second;
-        return std::nullopt;
+        return std::unexpected(SubGraphMappingError::EdgeMappingNotFound);
     }
 
-    std::optional<EdgeIdType> localEdgeId(EdgeIdType original) const
+    std::expected<EdgeIdType, SubGraphMappingError> localEdgeId(
+        EdgeIdType original) const
     {
         auto it = m_originalToLocalEdge.find(original);
+
         if (it != m_originalToLocalEdge.end())
             return it->second;
-        return std::nullopt;
+        return std::unexpected(SubGraphMappingError::EdgeMappingNotFound);
     }
 
 private:

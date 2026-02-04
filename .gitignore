@@ -50,3 +50,5 @@ CMakeUserPresets.json
 
 \.opencode
 opencode.json
+src/structures/build_structures
+AGENTS.md
