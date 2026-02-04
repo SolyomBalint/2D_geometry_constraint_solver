@@ -39,9 +39,6 @@ devenv.local.nix
 # direnv
 .direnv
 
-# pre-commit
-.pre-commit-config.yaml
-
 ## Custom ignores
 **/build/*
 
@@ -49,14 +46,7 @@ devenv.local.nix
 CMakeUserPresets.json
 
 .cache
-examples/*
-
 .vscode/
-pyproject.toml
-examples/internal/*
 
-**/__pycache__/*
-
-local_node_dev_tools
-segfault_inputs/
-**/demos/*
+\.opencode
+opencode.json

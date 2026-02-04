@@ -32,39 +32,21 @@ in
     doxygen
     gdb
     valgrind
-    virtualglLib
-    sass
-
-    ## Example gui dependencies
-    (python313.withPackages (ps: with ps; [ graph-tool ]))
-    ### For graph_tool
-    gtk3
-    gsettings-desktop-schemas
-    librsvg
-    glib
-    gobject-introspection
-    cairo
   ];
 
   languages.python = {
     enable = true;
-    version = "3.13";
+    version = "3.14";
     venv = {
       enable = true;
       requirements = ''
-        nanobind
         conan
         conan-stubs
         mypy
-
-        scipy
-        PyGObject
-        numpy
-        pycairo
-        matplotlib
       '';
     };
   };
+
   enterShell = ''
     export CC=clang
     export CXX=clang++
@@ -101,8 +83,5 @@ in
         $CONAN_CMD
     fi
     echo
-
-    export XDG_DATA_DIRS="${pkgs_unstable.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs_unstable.gsettings-desktop-schemas.name}:${pkgs_unstable.gtk3}/share/gsettings-schemas/${pkgs_unstable.gtk3.name}:$XDG_DATA_DIRS"
-    export GI_TYPELIB_PATH="${pkgs_unstable.gtk3}/lib/girepository-1.0:${pkgs_unstable.gobject-introspection}/lib/girepository-1.0:$GI_TYPELIB_PATH"
   '';
 }
