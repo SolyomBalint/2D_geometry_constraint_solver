@@ -109,6 +109,56 @@ inline auto lineToLineAngle(
     };
 }
 
+/**
+ * @brief Signed distance difference for a line parameterized by its
+ *        unit normal.
+ *
+ * When solving for a free line given two known points at known
+ * perpendicular distances, the line is parameterized by its unit
+ * normal vector @c (nx, ny).  The signed perpendicular distances
+ * from the two fixed points to the line satisfy:
+ *
+ * @c nx * (P2x - P1x) + ny * (P2y - P1y)
+ *     + signedDistToPoint1 - signedDistToPoint2 = 0
+ *
+ * The unknowns @c x and @c y represent the normal vector
+ * components @c nx and @c ny.
+ *
+ * @param deltaX   Difference @c P2x - P1x.
+ * @param deltaY   Difference @c P2y - P1y.
+ * @param signedDistanceToPoint1  Signed perpendicular distance from
+ *                                point 1 to the line (sign from
+ *                                canvas layout).
+ * @param signedDistanceToPoint2  Signed perpendicular distance from
+ *                                point 2 to the line (sign from
+ *                                canvas layout).
+ * @return Autodiff-compatible lambda @c (dual nx, dual ny) -> dual.
+ */
+inline auto lineNormalSignedDistanceDiff(dual deltaX, dual deltaY,
+    dual signedDistanceToPoint1, dual signedDistanceToPoint2)
+{
+    return [deltaX, deltaY, signedDistanceToPoint1, signedDistanceToPoint2](
+               dual nx, dual ny) -> dual {
+        return nx * deltaX + ny * deltaY + signedDistanceToPoint1
+            - signedDistanceToPoint2;
+    };
+}
+
+/**
+ * @brief Unit-length constraint for a normal vector.
+ *
+ * Returns a lambda encoding @c nx^2 + ny^2 - 1 = 0, ensuring
+ * that the unknowns @c (nx, ny) form a unit vector. Used
+ * together with @c lineNormalSignedDistanceDiff to fully
+ * determine a free line.
+ *
+ * @return Autodiff-compatible lambda @c (dual nx, dual ny) -> dual.
+ */
+inline auto unitNormalConstraint()
+{
+    return [](dual nx, dual ny) -> dual { return nx * nx + ny * ny - 1.0; };
+}
+
 } // namespace Gcs::Equations
 
 #endif // EQUATION_PRIMITIVES_HPP

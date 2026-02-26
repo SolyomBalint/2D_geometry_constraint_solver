@@ -27,19 +27,20 @@ static constexpr int32_t MAXIMUM_ITERATIONS = 1000;
  * solves @c J_f(x_k) * s_k = -f(x_k), then updates
  * @c x_{k+1} = x_k + s_k.
  *
- * Tries two symmetric initial guesses @c (2000, 2000) and
- * @c (-2000, -2000), returning both candidate solutions. The caller
- * is responsible for choosing the geometrically correct one using
- * a disambiguation heuristic.
+ * Tries each provided initial guess, returning a candidate
+ * solution per guess. The caller is responsible for choosing the
+ * geometrically correct one using a disambiguation heuristic.
  *
  * @tparam FuncF Callable with signature @c (dual x, dual y) -> dual.
  * @tparam FuncG Callable with signature @c (dual x, dual y) -> dual.
  * @param f First equation.
  * @param g Second equation.
+ * @param initialGuesses Two starting points for Newton-Raphson.
  * @return Two candidate solutions as @c Eigen::Vector2d.
  */
 template <typename FuncF, typename FuncG>
-std::array<Eigen::Vector2d, 2> solve2D(FuncF&& f, FuncG&& g)
+std::array<Eigen::Vector2d, 2> solve2D(
+    FuncF&& f, FuncG&& g, const std::array<Eigen::Vector2d, 2>& initialGuesses)
 {
     using autodiff::at;
     using autodiff::derivative;
@@ -47,15 +48,13 @@ std::array<Eigen::Vector2d, 2> solve2D(FuncF&& f, FuncG&& g)
     using autodiff::wrt;
     using DualVec = Eigen::Matrix<dual, 2, 1>;
 
-    std::array<DualVec, 2> initialGuesses {
-        (DualVec() << 2000, 2000).finished(),
-        (DualVec() << -2000, -2000).finished()
-    };
-
     std::array<Eigen::Vector2d, 2> solutions {};
 
     for (std::size_t idx = 0; idx < initialGuesses.size(); ++idx) {
-        auto& vars = initialGuesses[idx];
+        DualVec vars;
+        vars.x() = dual(initialGuesses[idx].x());
+        vars.y() = dual(initialGuesses[idx].y());
+
         DualVec prevVars = { 0, 0 };
 
         Eigen::Matrix2d jacobian;
@@ -100,6 +99,31 @@ std::array<Eigen::Vector2d, 2> solve2D(FuncF&& f, FuncG&& g)
     }
 
     return solutions;
+}
+
+/// @brief Default initial guesses for spatial-coordinate unknowns.
+inline const std::array<Eigen::Vector2d, 2> DEFAULT_SPATIAL_GUESSES {
+    Eigen::Vector2d { 2000.0, 2000.0 }, Eigen::Vector2d { -2000.0, -2000.0 }
+};
+
+/**
+ * @brief Convenience overload using default initial guesses.
+ *
+ * Uses symmetric spatial initial guesses @c (2000, 2000) and
+ * @c (-2000, -2000), suitable when the unknowns represent
+ * point coordinates.
+ *
+ * @tparam FuncF Callable with signature @c (dual x, dual y) -> dual.
+ * @tparam FuncG Callable with signature @c (dual x, dual y) -> dual.
+ * @param f First equation.
+ * @param g Second equation.
+ * @return Two candidate solutions as @c Eigen::Vector2d.
+ */
+template <typename FuncF, typename FuncG>
+std::array<Eigen::Vector2d, 2> solve2D(FuncF&& f, FuncG&& g)
+{
+    return solve2D(std::forward<FuncF>(f), std::forward<FuncG>(g),
+        DEFAULT_SPATIAL_GUESSES);
 }
 
 } // namespace Gcs::Equations

@@ -62,6 +62,16 @@ std::optional<ConstraintId> ConstraintModel::addDistanceConstraint(
     if (itA == m_elemToNode.end() || itB == m_elemToNode.end())
         return std::nullopt;
 
+    // Reject distance constraints between two Line elements —
+    // perpendicular distance between two lines is not a
+    // meaningful geometric constraint in this solver.
+    auto elementA = m_constraintGraph.getElement(itA->second);
+    auto elementB = m_constraintGraph.getElement(itB->second);
+    if (elementA && elementB && elementA->isElementType<Gcs::Line>()
+        && elementB->isElementType<Gcs::Line>()) {
+        return std::nullopt;
+    }
+
     auto edgeResult
         = m_constraintGraph.getGraph().addEdge(itA->second, itB->second);
     if (!edgeResult.has_value())

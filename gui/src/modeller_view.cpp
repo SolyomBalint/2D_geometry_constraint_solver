@@ -181,7 +181,7 @@ void ModellerView::onConstraintRequested(ElementId elemA, ElementId elemB)
         auto text = entry->get_text();
         try {
             double distance = std::stod(std::string(text));
-            if (distance > 0.0) {
+            if (distance >= 0.0) {
                 auto cid
                     = m_model.addDistanceConstraint(elemA, elemB, distance);
                 if (cid.has_value()) {

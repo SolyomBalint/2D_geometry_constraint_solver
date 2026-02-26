@@ -4,6 +4,7 @@
 // Custom headers
 #include "./gcs_data_structures.hpp"
 #include "./solve_result.hpp"
+#include "./solvers/point_line_solvers.hpp"
 #include "./solvers/point_point_solvers.hpp"
 
 namespace Gcs {
@@ -33,11 +34,23 @@ inline SolveResult classifyAndSolve(ConstraintGraph& component)
     if (Solvers::ZeroFixedPointsTriangleSolver::matches(component))
         return Solvers::ZeroFixedPointsTriangleSolver::solve(component);
 
+    if (Solvers::ZeroFixedPPLTriangleSolver::matches(component))
+        return Solvers::ZeroFixedPPLTriangleSolver::solve(component);
+
     // --- Partially solved configurations (separator nodes from
     //     previously solved components) ---
 
     if (Solvers::TwoFixedPointsDistanceSolver::matches(component))
         return Solvers::TwoFixedPointsDistanceSolver::solve(component);
+
+    if (Solvers::TwoFixedPointsLineSolver::matches(component))
+        return Solvers::TwoFixedPointsLineSolver::solve(component);
+
+    if (Solvers::FixedPointAndLineFreePointSolver::matches(component))
+        return Solvers::FixedPointAndLineFreePointSolver::solve(component);
+
+    if (Solvers::TwoFixedLinesFreePointSolver::matches(component))
+        return Solvers::TwoFixedLinesFreePointSolver::solve(component);
 
     // --- Default: no solver found ---
 
