@@ -28,6 +28,7 @@ private:
 
     void onToolChanged(Tool tool);
     void onConstraintRequested(ElementId elemA, ElementId elemB);
+    void onAngleConstraintRequested(ElementId elemA, ElementId elemB);
     void onSolveClicked();
     void onStatusChanged(const Glib::ustring& status);
 
@@ -41,7 +42,8 @@ private:
     Gtk::ToggleButton m_selectBtn;
     Gtk::ToggleButton m_pointBtn;
     Gtk::ToggleButton m_lineBtn;
-    Gtk::ToggleButton m_constraintBtn;
+    Gtk::ToggleButton m_distanceConstraintBtn;
+    Gtk::ToggleButton m_angleConstraintBtn;
     Gtk::ToggleButton m_deleteBtn;
 
     // Action buttons

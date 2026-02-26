@@ -4,6 +4,7 @@
 // Custom headers
 #include "./gcs_data_structures.hpp"
 #include "./solve_result.hpp"
+#include "./solvers/line_angle_solvers.hpp"
 #include "./solvers/point_line_solvers.hpp"
 #include "./solvers/point_point_solvers.hpp"
 
@@ -37,6 +38,9 @@ inline SolveResult classifyAndSolve(ConstraintGraph& component)
     if (Solvers::ZeroFixedPPLTriangleSolver::matches(component))
         return Solvers::ZeroFixedPPLTriangleSolver::solve(component);
 
+    if (Solvers::ZeroFixedLLPAngleTriangleSolver::matches(component))
+        return Solvers::ZeroFixedLLPAngleTriangleSolver::solve(component);
+
     // --- Partially solved configurations (separator nodes from
     //     previously solved components) ---
 
@@ -51,6 +55,9 @@ inline SolveResult classifyAndSolve(ConstraintGraph& component)
 
     if (Solvers::TwoFixedLinesFreePointSolver::matches(component))
         return Solvers::TwoFixedLinesFreePointSolver::solve(component);
+
+    if (Solvers::FixedLineAndPointFreeLineSolver::matches(component))
+        return Solvers::FixedLineAndPointFreeLineSolver::solve(component);
 
     // --- Default: no solver found ---
 

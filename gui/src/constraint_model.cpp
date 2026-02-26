@@ -1,8 +1,10 @@
 #include "constraint_model.hpp"
 
 // General STD/STL headers
+#include <cmath>
 #include <format>
 #include <memory>
+#include <numbers>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -89,6 +91,44 @@ std::optional<ConstraintId> ConstraintModel::addDistanceConstraint(
 
     notifyChange();
     return cid;
+}
+
+std::optional<ConstraintId> ConstraintModel::addAngleConstraint(
+    ElementId elemA, ElementId elemB, double angleDegrees)
+{
+    auto itA = m_elemToNode.find(elemA);
+    auto itB = m_elemToNode.find(elemB);
+    if (itA == m_elemToNode.end() || itB == m_elemToNode.end()) {
+        return std::nullopt;
+    }
+
+    // Angle constraints are only valid between two Line elements.
+    auto elementA = m_constraintGraph.getElement(itA->second);
+    auto elementB = m_constraintGraph.getElement(itB->second);
+    if (!elementA || !elementB || !elementA->isElementType<Gcs::Line>()
+        || !elementB->isElementType<Gcs::Line>()) {
+        return std::nullopt;
+    }
+
+    auto edgeResult
+        = m_constraintGraph.getGraph().addEdge(itA->second, itB->second);
+    if (!edgeResult.has_value()) {
+        return std::nullopt;
+    }
+
+    auto edgeId = edgeResult.value();
+    double angleRadians = angleDegrees * std::numbers::pi / 180.0;
+    auto constraint
+        = std::make_shared<Gcs::Constraint>(Gcs::AngleConstraint(angleRadians));
+
+    m_constraintGraph.addConstraint(edgeId, constraint);
+
+    ConstraintId constraintId = m_nextConstraintId++;
+    m_constrToEdge[constraintId] = edgeId;
+    m_edgeToConstr[edgeId.value] = constraintId;
+
+    notifyChange();
+    return constraintId;
 }
 
 bool ConstraintModel::removeElement(ElementId id)
@@ -221,6 +261,21 @@ std::optional<double> ConstraintModel::getConstraintValue(ConstraintId id) const
     if (val.has_value())
         return val.value();
     return std::nullopt;
+}
+
+bool ConstraintModel::isAngleConstraint(ConstraintId id) const
+{
+    auto it = m_constrToEdge.find(id);
+    if (it == m_constrToEdge.end()) {
+        return false;
+    }
+
+    auto constraint = m_constraintGraph.getConstraintForEdge(it->second);
+    if (!constraint) {
+        return false;
+    }
+
+    return constraint->isConstraintType<Gcs::AngleConstraint>();
 }
 
 std::vector<ConstraintId> ConstraintModel::getConstraintsForElement(

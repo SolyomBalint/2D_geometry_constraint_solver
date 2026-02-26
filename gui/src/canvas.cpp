@@ -17,6 +17,7 @@ namespace {
     constexpr double MAX_ZOOM = 20.0;
 
     constexpr double CONSTRAINT_LABEL_OFFSET = 12.0;
+    constexpr double ANGLE_ARC_RADIUS = 30.0;
 } // namespace
 
 Canvas::Canvas(ConstraintModel& model)
@@ -77,6 +78,7 @@ void Canvas::setTool(Tool tool)
     m_currentTool = tool;
     m_lineFirstPointSet = false;
     m_constraintFirstElement.reset();
+    m_angleConstraintFirstElement.reset();
     updateStatus();
     queue_draw();
 }
@@ -145,6 +147,17 @@ Canvas::StatusSignal Canvas::signalStatusChanged()
 Canvas::ConstraintRequestSignal Canvas::signalConstraintRequested()
 {
     return m_constraintRequestSignal;
+}
+
+Canvas::AngleConstraintRequestSignal Canvas::signalAngleConstraintRequested()
+{
+    return m_angleConstraintRequestSignal;
+}
+
+void Canvas::addCanvasConstraint(const CanvasConstraint& constraint)
+{
+    m_constraints[constraint.id] = constraint;
+    queue_draw();
 }
 
 // ============================================================
@@ -268,58 +281,187 @@ void Canvas::drawElements(const Cairo::RefPtr<Cairo::Context>& cr)
 
 void Canvas::drawConstraints(const Cairo::RefPtr<Cairo::Context>& cr)
 {
-    double lineWidth = 1.5 / m_zoom;
     double fontSize = 11.0 / m_zoom;
 
-    for (const auto& [cid, constr] : m_constraints) {
-        auto itA = m_elements.find(constr.elementA);
-        auto itB = m_elements.find(constr.elementB);
-        if (itA == m_elements.end() || itB == m_elements.end())
+    for (const auto& [constraintId, constraint] : m_constraints) {
+        auto iteratorA = m_elements.find(constraint.elementA);
+        auto iteratorB = m_elements.find(constraint.elementB);
+        if (iteratorA == m_elements.end() || iteratorB == m_elements.end()) {
             continue;
-
-        const auto& elemA = itA->second;
-        const auto& elemB = itB->second;
-
-        // Compute center points for each element
-        double ax = elemA.x;
-        double ay = elemA.y;
-        double bx = elemB.x;
-        double by = elemB.y;
-
-        if (elemA.type == CanvasElementType::Line) {
-            ax = (elemA.x + elemA.x2) / 2.0;
-            ay = (elemA.y + elemA.y2) / 2.0;
-        }
-        if (elemB.type == CanvasElementType::Line) {
-            bx = (elemB.x + elemB.x2) / 2.0;
-            by = (elemB.y + elemB.y2) / 2.0;
         }
 
-        // Draw dashed line between elements
-        cr->set_source_rgba(0.8, 0.2, 0.2, 0.7);
-        cr->set_line_width(lineWidth);
-        std::vector<double> dashes = { 6.0 / m_zoom, 4.0 / m_zoom };
-        cr->set_dash(dashes, 0);
-        cr->move_to(ax, ay);
-        cr->line_to(bx, by);
-        cr->stroke();
-        cr->unset_dash();
+        const auto& elementA = iteratorA->second;
+        const auto& elementB = iteratorB->second;
 
-        // Draw distance label at midpoint
-        double mx = (ax + bx) / 2.0;
-        double my = (ay + by) / 2.0;
-
-        cr->set_source_rgb(0.8, 0.1, 0.1);
-        cr->set_font_size(fontSize);
-
-        std::string label = std::format("{:.1f}", constr.value);
-        Cairo::TextExtents extents;
-        cr->get_text_extents(label, extents);
-
-        cr->move_to(
-            mx - extents.width / 2.0, my - CONSTRAINT_LABEL_OFFSET / m_zoom);
-        cr->show_text(label);
+        if (constraint.type == CanvasConstraintType::Angle) {
+            drawAngleConstraint(cr, constraint, elementA, elementB, fontSize);
+        } else {
+            drawDistanceConstraint(
+                cr, constraint, elementA, elementB, fontSize);
+        }
     }
+}
+
+void Canvas::drawDistanceConstraint(const Cairo::RefPtr<Cairo::Context>& cr,
+    const CanvasConstraint& constraint, const CanvasElement& elementA,
+    const CanvasElement& elementB, double fontSize)
+{
+    double lineWidth = 1.5 / m_zoom;
+
+    // Compute center points for each element
+    double centerAX = elementA.x;
+    double centerAY = elementA.y;
+    double centerBX = elementB.x;
+    double centerBY = elementB.y;
+
+    if (elementA.type == CanvasElementType::Line) {
+        centerAX = (elementA.x + elementA.x2) / 2.0;
+        centerAY = (elementA.y + elementA.y2) / 2.0;
+    }
+    if (elementB.type == CanvasElementType::Line) {
+        centerBX = (elementB.x + elementB.x2) / 2.0;
+        centerBY = (elementB.y + elementB.y2) / 2.0;
+    }
+
+    // Draw dashed line between elements
+    cr->set_source_rgba(0.8, 0.2, 0.2, 0.7);
+    cr->set_line_width(lineWidth);
+    std::vector<double> dashes = { 6.0 / m_zoom, 4.0 / m_zoom };
+    cr->set_dash(dashes, 0);
+    cr->move_to(centerAX, centerAY);
+    cr->line_to(centerBX, centerBY);
+    cr->stroke();
+    cr->unset_dash();
+
+    // Draw distance label at midpoint
+    double midpointX = (centerAX + centerBX) / 2.0;
+    double midpointY = (centerAY + centerBY) / 2.0;
+
+    cr->set_source_rgb(0.8, 0.1, 0.1);
+    cr->set_font_size(fontSize);
+
+    std::string label = std::format("{:.1f}", constraint.value);
+    Cairo::TextExtents extents;
+    cr->get_text_extents(label, extents);
+
+    cr->move_to(midpointX - extents.width / 2.0,
+        midpointY - CONSTRAINT_LABEL_OFFSET / m_zoom);
+    cr->show_text(label);
+}
+
+void Canvas::drawAngleConstraint(const Cairo::RefPtr<Cairo::Context>& cr,
+    const CanvasConstraint& constraint, const CanvasElement& lineA,
+    const CanvasElement& lineB, double fontSize)
+{
+    // Compute the intersection point of the two lines.
+    // Line A: from (lineA.x, lineA.y) to (lineA.x2, lineA.y2)
+    // Line B: from (lineB.x, lineB.y) to (lineB.x2, lineB.y2)
+    double directionAX = lineA.x2 - lineA.x;
+    double directionAY = lineA.y2 - lineA.y;
+    double directionBX = lineB.x2 - lineB.x;
+    double directionBY = lineB.y2 - lineB.y;
+
+    // Solve for intersection using parametric form:
+    //   P = lineA.p1 + t * dirA
+    //   P = lineB.p1 + s * dirB
+    // Cross product of directions (determinant of 2x2 matrix)
+    double crossProduct = directionAX * directionBY - directionAY * directionBX;
+
+    double intersectionX = 0.0;
+    double intersectionY = 0.0;
+
+    if (std::abs(crossProduct) < 1e-9) {
+        // Lines are nearly parallel — fall back to midpoint of
+        // the two line midpoints.
+        intersectionX = (lineA.x + lineA.x2 + lineB.x + lineB.x2) / 4.0;
+        intersectionY = (lineA.y + lineA.y2 + lineB.y + lineB.y2) / 4.0;
+    } else {
+        // Parametric t for the intersection on line A
+        double deltaOriginX = lineB.x - lineA.x;
+        double deltaOriginY = lineB.y - lineA.y;
+        double parameterT
+            = (deltaOriginX * directionBY - deltaOriginY * directionBX)
+            / crossProduct;
+        intersectionX = lineA.x + parameterT * directionAX;
+        intersectionY = lineA.y + parameterT * directionAY;
+    }
+
+    // Compute the angle of each line direction relative to X axis.
+    double angleA = std::atan2(directionAY, directionAX);
+    double angleB = std::atan2(directionBY, directionBX);
+
+    // Normalize angles so the arc sweeps the smaller angle between
+    // the two line directions. We want to draw the arc from angleA
+    // to angleB through the smaller angular sweep.
+    double angleDifference = angleB - angleA;
+
+    // Normalize to [-pi, pi]
+    while (angleDifference > std::numbers::pi) {
+        angleDifference -= 2.0 * std::numbers::pi;
+    }
+    while (angleDifference < -std::numbers::pi) {
+        angleDifference += 2.0 * std::numbers::pi;
+    }
+
+    double arcStartAngle = angleA;
+    double arcEndAngle = angleA + angleDifference;
+
+    // Draw the arc
+    double arcRadius = ANGLE_ARC_RADIUS / m_zoom;
+    cr->set_source_rgba(0.1, 0.5, 0.8, 0.8);
+    cr->set_line_width(1.5 / m_zoom);
+
+    if (angleDifference >= 0.0) {
+        cr->arc(intersectionX, intersectionY, arcRadius, arcStartAngle,
+            arcEndAngle);
+    } else {
+        cr->arc_negative(intersectionX, intersectionY, arcRadius, arcStartAngle,
+            arcEndAngle);
+    }
+    cr->stroke();
+
+    // Draw small lines from the intersection outward along each
+    // line direction to visually anchor the arc.
+    double tickLength = arcRadius * 1.3;
+    cr->set_source_rgba(0.1, 0.5, 0.8, 0.5);
+    cr->set_line_width(1.0 / m_zoom);
+
+    double lengthA = std::hypot(directionAX, directionAY);
+    double lengthB = std::hypot(directionBX, directionBY);
+
+    if (lengthA > 1e-9) {
+        double unitAX = directionAX / lengthA;
+        double unitAY = directionAY / lengthA;
+        cr->move_to(intersectionX, intersectionY);
+        cr->line_to(intersectionX + unitAX * tickLength,
+            intersectionY + unitAY * tickLength);
+        cr->stroke();
+    }
+    if (lengthB > 1e-9) {
+        double unitBX = directionBX / lengthB;
+        double unitBY = directionBY / lengthB;
+        cr->move_to(intersectionX, intersectionY);
+        cr->line_to(intersectionX + unitBX * tickLength,
+            intersectionY + unitBY * tickLength);
+        cr->stroke();
+    }
+
+    // Draw the angle label at the midpoint of the arc
+    double labelAngle = arcStartAngle + angleDifference / 2.0;
+    double labelRadius = arcRadius + CONSTRAINT_LABEL_OFFSET / m_zoom;
+    double labelX = intersectionX + labelRadius * std::cos(labelAngle);
+    double labelY = intersectionY + labelRadius * std::sin(labelAngle);
+
+    cr->set_source_rgb(0.1, 0.4, 0.7);
+    cr->set_font_size(fontSize);
+
+    // Display the angle in degrees with degree symbol
+    std::string label = std::format("{:.1f}\u00B0", constraint.value);
+    Cairo::TextExtents extents;
+    cr->get_text_extents(label, extents);
+
+    cr->move_to(labelX - extents.width / 2.0, labelY + extents.height / 2.0);
+    cr->show_text(label);
 }
 
 void Canvas::drawPendingLine(const Cairo::RefPtr<Cairo::Context>& cr)
@@ -384,37 +526,93 @@ std::optional<ConstraintId> Canvas::hitTestConstraint(
 {
     double tolerance = HIT_TOLERANCE / m_zoom;
 
-    for (const auto& [cid, constr] : m_constraints) {
-        auto itA = m_elements.find(constr.elementA);
-        auto itB = m_elements.find(constr.elementB);
-        if (itA == m_elements.end() || itB == m_elements.end())
+    for (const auto& [constraintId, constraint] : m_constraints) {
+        auto iteratorA = m_elements.find(constraint.elementA);
+        auto iteratorB = m_elements.find(constraint.elementB);
+        if (iteratorA == m_elements.end() || iteratorB == m_elements.end()) {
             continue;
-
-        const auto& elemA = itA->second;
-        const auto& elemB = itB->second;
-
-        double ax = elemA.x;
-        double ay = elemA.y;
-        double bx = elemB.x;
-        double by = elemB.y;
-
-        if (elemA.type == CanvasElementType::Line) {
-            ax = (elemA.x + elemA.x2) / 2.0;
-            ay = (elemA.y + elemA.y2) / 2.0;
-        }
-        if (elemB.type == CanvasElementType::Line) {
-            bx = (elemB.x + elemB.x2) / 2.0;
-            by = (elemB.y + elemB.y2) / 2.0;
         }
 
-        // Midpoint of constraint visual
-        double mx = (ax + bx) / 2.0;
-        double my = (ay + by) / 2.0;
+        const auto& elementA = iteratorA->second;
+        const auto& elementB = iteratorB->second;
 
-        double dx = wx - mx;
-        double dy = wy - my;
-        if (dx * dx + dy * dy <= tolerance * tolerance * 4.0)
-            return cid;
+        double hitPointX = 0.0;
+        double hitPointY = 0.0;
+
+        if (constraint.type == CanvasConstraintType::Angle) {
+            // For angle constraints, hit-test near the arc label
+            // position: the midpoint of the arc at the intersection
+            // of the two lines.
+            double directionAX = elementA.x2 - elementA.x;
+            double directionAY = elementA.y2 - elementA.y;
+            double directionBX = elementB.x2 - elementB.x;
+            double directionBY = elementB.y2 - elementB.y;
+
+            double crossProduct
+                = directionAX * directionBY - directionAY * directionBX;
+
+            double intersectionX = 0.0;
+            double intersectionY = 0.0;
+
+            if (std::abs(crossProduct) < 1e-9) {
+                intersectionX
+                    = (elementA.x + elementA.x2 + elementB.x + elementB.x2)
+                    / 4.0;
+                intersectionY
+                    = (elementA.y + elementA.y2 + elementB.y + elementB.y2)
+                    / 4.0;
+            } else {
+                double deltaOriginX = elementB.x - elementA.x;
+                double deltaOriginY = elementB.y - elementA.y;
+                double parameterT
+                    = (deltaOriginX * directionBY - deltaOriginY * directionBX)
+                    / crossProduct;
+                intersectionX = elementA.x + parameterT * directionAX;
+                intersectionY = elementA.y + parameterT * directionAY;
+            }
+
+            // Arc midpoint angle
+            double angleA = std::atan2(directionAY, directionAX);
+            double angleB = std::atan2(directionBY, directionBX);
+            double angleDifference = angleB - angleA;
+            while (angleDifference > std::numbers::pi) {
+                angleDifference -= 2.0 * std::numbers::pi;
+            }
+            while (angleDifference < -std::numbers::pi) {
+                angleDifference += 2.0 * std::numbers::pi;
+            }
+
+            double labelAngle = angleA + angleDifference / 2.0;
+            double labelRadius
+                = ANGLE_ARC_RADIUS / m_zoom + CONSTRAINT_LABEL_OFFSET / m_zoom;
+            hitPointX = intersectionX + labelRadius * std::cos(labelAngle);
+            hitPointY = intersectionY + labelRadius * std::sin(labelAngle);
+        } else {
+            // For distance constraints, hit-test at the midpoint of
+            // the dashed line between element centers.
+            double centerAX = elementA.x;
+            double centerAY = elementA.y;
+            double centerBX = elementB.x;
+            double centerBY = elementB.y;
+
+            if (elementA.type == CanvasElementType::Line) {
+                centerAX = (elementA.x + elementA.x2) / 2.0;
+                centerAY = (elementA.y + elementA.y2) / 2.0;
+            }
+            if (elementB.type == CanvasElementType::Line) {
+                centerBX = (elementB.x + elementB.x2) / 2.0;
+                centerBY = (elementB.y + elementB.y2) / 2.0;
+            }
+
+            hitPointX = (centerAX + centerBX) / 2.0;
+            hitPointY = (centerAY + centerBY) / 2.0;
+        }
+
+        double deltaX = wx - hitPointX;
+        double deltaY = wy - hitPointY;
+        if (deltaX * deltaX + deltaY * deltaY <= tolerance * tolerance * 4.0) {
+            return constraintId;
+        }
     }
 
     return std::nullopt;
@@ -460,6 +658,9 @@ void Canvas::onClickPressed([[maybe_unused]] int nPress, double x, double y)
         break;
     case Tool::DistanceConstraint:
         handleConstraintClick(wx, wy);
+        break;
+    case Tool::AngleConstraint:
+        handleAngleConstraintClick(wx, wy);
         break;
     case Tool::Delete:
         handleDeleteClick(wx, wy);
@@ -593,6 +794,7 @@ bool Canvas::onKeyPressed(guint keyval, [[maybe_unused]] guint keycode,
         clearSelection();
         m_lineFirstPointSet = false;
         m_constraintFirstElement.reset();
+        m_angleConstraintFirstElement.reset();
         updateStatus();
         return true;
     }
@@ -681,6 +883,44 @@ void Canvas::handleConstraintClick(double wx, double wy)
     }
 }
 
+void Canvas::handleAngleConstraintClick(double wx, double wy)
+{
+    auto hit = hitTest(wx, wy);
+    if (!hit.has_value()) {
+        return;
+    }
+
+    // Only accept Line elements for angle constraints.
+    auto elementIterator = m_elements.find(*hit);
+    if (elementIterator == m_elements.end()
+        || elementIterator->second.type != CanvasElementType::Line) {
+        return;
+    }
+
+    if (!m_angleConstraintFirstElement.has_value()) {
+        m_angleConstraintFirstElement = hit;
+        // Highlight the first selected line
+        clearSelection();
+        m_selectedElement = hit;
+        m_elements[*hit].selected = true;
+        updateStatus();
+        queue_draw();
+    } else {
+        if (*m_angleConstraintFirstElement == *hit) {
+            // Can't constrain a line to itself
+            return;
+        }
+
+        // Emit signal to show angle constraint dialog
+        m_angleConstraintRequestSignal.emit(
+            *m_angleConstraintFirstElement, *hit);
+
+        m_angleConstraintFirstElement.reset();
+        clearSelection();
+        updateStatus();
+    }
+}
+
 void Canvas::handleDeleteClick(double wx, double wy)
 {
     // First try to hit a constraint
@@ -729,6 +969,13 @@ void Canvas::updateStatus()
         toolName = "Distance Constraint";
         if (m_constraintFirstElement.has_value())
             toolName += " (click second element)";
+        break;
+    case Tool::AngleConstraint:
+        toolName = "Angle Constraint";
+        if (m_angleConstraintFirstElement.has_value())
+            toolName += " (click second line)";
+        else
+            toolName += " (click first line)";
         break;
     case Tool::Delete:
         toolName = "Delete";

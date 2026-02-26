@@ -15,6 +15,7 @@ enum class Tool {
     Point, ///< Place a point on click.
     Line, ///< Place a line (two clicks for endpoints).
     DistanceConstraint, ///< Add distance constraint between two elements.
+    AngleConstraint, ///< Add angle constraint between two lines.
     Delete, ///< Delete an element or constraint on click.
 };
 
@@ -22,6 +23,12 @@ enum class Tool {
 enum class CanvasElementType {
     Point,
     Line,
+};
+
+/// @brief Type tag for visual canvas constraints.
+enum class CanvasConstraintType {
+    Distance, ///< Distance constraint (shown as dashed line + value).
+    Angle, ///< Angle constraint between two lines (shown as arc + degrees).
 };
 
 /// @brief A lightweight record of a visual element on the canvas.
@@ -41,6 +48,7 @@ struct CanvasConstraint {
     ElementId elementA;
     ElementId elementB;
     double value;
+    CanvasConstraintType type = CanvasConstraintType::Distance;
 };
 
 } // namespace Gui

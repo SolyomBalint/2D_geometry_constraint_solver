@@ -173,6 +173,64 @@ inline std::tuple<double, double, double> pickLineBySignedDistances(
     return { candidate1.x(), candidate1.y(), perpendicularOffset1 };
 }
 
+/**
+ * @brief Pick the candidate line normal whose angle orientation
+ *        matches the canvas layout.
+ *
+ * When solving for a free line given an angle constraint to a
+ * fixed line, Newton-Raphson produces two candidate normals
+ * (symmetric about the fixed line direction). This function
+ * picks the one that preserves the angular relationship from
+ * the canvas layout by comparing the cross-product sign of the
+ * fixed and free line directions.
+ *
+ * The cross product @c fixedDir x freeDir encodes which side of
+ * the fixed line the free line direction points to. The candidate
+ * whose cross-product sign matches the canvas layout is chosen.
+ *
+ * @param canvasFixedLineDirection Direction vector of the fixed
+ *        line in canvas space.
+ * @param canvasFreeLineDirection Direction vector of the free
+ *        line in canvas space.
+ * @param candidateNormal0 First NR solution @c (nx, ny).
+ * @param candidateNormal1 Second NR solution @c (nx, ny).
+ * @return Whichever candidate normal preserves the canvas angular
+ *         orientation.
+ */
+inline Eigen::Vector2d pickLineNormalByAngleOrientation(
+    const Eigen::Vector2d& canvasFixedLineDirection,
+    const Eigen::Vector2d& canvasFreeLineDirection,
+    const Eigen::Vector2d& candidateNormal0,
+    const Eigen::Vector2d& candidateNormal1)
+{
+    // Cross product: fixedDir x freeDir
+    double canvasCrossProduct
+        = canvasFixedLineDirection.x() * canvasFreeLineDirection.y()
+        - canvasFixedLineDirection.y() * canvasFreeLineDirection.x();
+
+    // Candidate 0's free line direction is the 90-degree CCW
+    // rotation of its normal: (-ny, nx)
+    Eigen::Vector2d candidateFreeDirection0 { -candidateNormal0.y(),
+        candidateNormal0.x() };
+
+    // Cross product of (solver) fixed direction with candidate 0's
+    // free direction. Note: the fixed line direction in solver space
+    // has the same angular relationship as in canvas space after
+    // Procrustes transform, so we only need the sign comparison.
+    // However, the fixed direction in solver space may differ in
+    // magnitude and sign. We use the canvas fixed direction for the
+    // cross product since what matters is the sign relationship.
+    double candidateCrossProduct0
+        = canvasFixedLineDirection.x() * candidateFreeDirection0.y()
+        - canvasFixedLineDirection.y() * candidateFreeDirection0.x();
+
+    auto sign = [](double x) { return (x > 0) - (x < 0); };
+
+    return (sign(canvasCrossProduct) == sign(candidateCrossProduct0))
+        ? candidateNormal0
+        : candidateNormal1;
+}
+
 } // namespace Gcs::Solvers
 
 #endif // HEURISTICS_HPP

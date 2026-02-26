@@ -51,6 +51,15 @@ struct TangencyConstraint {
     std::expected<double, ConstraintError> getConstraintValue() const;
 };
 
+struct AngleConstraint {
+    double angle;
+
+    explicit AngleConstraint(double a);
+
+    std::string getTypeName() const;
+    std::expected<double, ConstraintError> getConstraintValue() const;
+};
+
 struct PointOnLineConstraint {
     explicit PointOnLineConstraint();
 
@@ -68,8 +77,9 @@ struct VirtualConstraint {
 template <ConstraintType... Types>
 using ConstraintInterface = std::variant<Types...>;
 
-using ConstraintVariant = ConstraintInterface<DistanceConstraint,
-    TangencyConstraint, PointOnLineConstraint, VirtualConstraint>;
+using ConstraintVariant
+    = ConstraintInterface<DistanceConstraint, TangencyConstraint,
+        AngleConstraint, PointOnLineConstraint, VirtualConstraint>;
 
 class Constraint final {
 private:

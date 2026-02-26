@@ -25,6 +25,8 @@ ModellerView::ModellerView(ConstraintModel& model)
         sigc::mem_fun(*this, &ModellerView::onStatusChanged));
     m_canvas.signalConstraintRequested().connect(
         sigc::mem_fun(*this, &ModellerView::onConstraintRequested));
+    m_canvas.signalAngleConstraintRequested().connect(
+        sigc::mem_fun(*this, &ModellerView::onAngleConstraintRequested));
 
     // Default tool
     onToolChanged(Tool::Select);
@@ -40,14 +42,17 @@ void ModellerView::buildToolbar()
     m_selectBtn.set_label("Select");
     m_pointBtn.set_label("Point");
     m_lineBtn.set_label("Line");
-    m_constraintBtn.set_label("Distance");
+    m_distanceConstraintBtn.set_label("Distance");
+    m_angleConstraintBtn.set_label("Angle");
     m_deleteBtn.set_label("Delete");
 
     m_selectBtn.set_tooltip_text("Select and move elements (S)");
     m_pointBtn.set_tooltip_text("Create a point (P)");
     m_lineBtn.set_tooltip_text("Create a line (L)");
-    m_constraintBtn.set_tooltip_text(
+    m_distanceConstraintBtn.set_tooltip_text(
         "Add distance constraint between elements (D)");
+    m_angleConstraintBtn.set_tooltip_text(
+        "Add angle constraint between two lines (A)");
     m_deleteBtn.set_tooltip_text("Delete elements or constraints (X)");
 
     // Group toggle buttons manually (only one active at a time)
@@ -60,8 +65,10 @@ void ModellerView::buildToolbar()
             m_pointBtn.set_active(false);
         if (&active != &m_lineBtn)
             m_lineBtn.set_active(false);
-        if (&active != &m_constraintBtn)
-            m_constraintBtn.set_active(false);
+        if (&active != &m_distanceConstraintBtn)
+            m_distanceConstraintBtn.set_active(false);
+        if (&active != &m_angleConstraintBtn)
+            m_angleConstraintBtn.set_active(false);
         if (&active != &m_deleteBtn)
             m_deleteBtn.set_active(false);
         onToolChanged(tool);
@@ -73,8 +80,11 @@ void ModellerView::buildToolbar()
         [this, setExclusive]() { setExclusive(m_pointBtn, Tool::Point); });
     m_lineBtn.signal_toggled().connect(
         [this, setExclusive]() { setExclusive(m_lineBtn, Tool::Line); });
-    m_constraintBtn.signal_toggled().connect([this, setExclusive]() {
-        setExclusive(m_constraintBtn, Tool::DistanceConstraint);
+    m_distanceConstraintBtn.signal_toggled().connect([this, setExclusive]() {
+        setExclusive(m_distanceConstraintBtn, Tool::DistanceConstraint);
+    });
+    m_angleConstraintBtn.signal_toggled().connect([this, setExclusive]() {
+        setExclusive(m_angleConstraintBtn, Tool::AngleConstraint);
     });
     m_deleteBtn.signal_toggled().connect(
         [this, setExclusive]() { setExclusive(m_deleteBtn, Tool::Delete); });
@@ -82,7 +92,8 @@ void ModellerView::buildToolbar()
     m_toolbar.append(m_selectBtn);
     m_toolbar.append(m_pointBtn);
     m_toolbar.append(m_lineBtn);
-    m_toolbar.append(m_constraintBtn);
+    m_toolbar.append(m_distanceConstraintBtn);
+    m_toolbar.append(m_angleConstraintBtn);
     m_toolbar.append(m_deleteBtn);
 
     // Separator before solve button
@@ -163,15 +174,16 @@ void ModellerView::onConstraintRequested(ElementId elemA, ElementId elemB)
     entry->set_input_purpose(Gtk::InputPurpose::NUMBER);
     box->append(*entry);
 
-    auto btnBox = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::HORIZONTAL, 8);
-    btnBox->set_halign(Gtk::Align::END);
+    auto buttonBox
+        = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::HORIZONTAL, 8);
+    buttonBox->set_halign(Gtk::Align::END);
 
     auto cancelBtn = Gtk::make_managed<Gtk::Button>("Cancel");
     auto okBtn = Gtk::make_managed<Gtk::Button>("OK");
     okBtn->add_css_class("suggested-action");
-    btnBox->append(*cancelBtn);
-    btnBox->append(*okBtn);
-    box->append(*btnBox);
+    buttonBox->append(*cancelBtn);
+    buttonBox->append(*okBtn);
+    box->append(*buttonBox);
 
     dialog->set_child(*box);
 
@@ -182,22 +194,85 @@ void ModellerView::onConstraintRequested(ElementId elemA, ElementId elemB)
         try {
             double distance = std::stod(std::string(text));
             if (distance >= 0.0) {
-                auto cid
+                auto constraintId
                     = m_model.addDistanceConstraint(elemA, elemB, distance);
-                if (cid.has_value()) {
-                    CanvasConstraint cc {};
-                    cc.id = *cid;
-                    cc.elementA = elemA;
-                    cc.elementB = elemB;
-                    cc.value = distance;
-                    // Access canvas constraints through
-                    // non-const reference (we're friends
-                    // conceptually)
-                    const_cast<
-                        std::unordered_map<ConstraintId, CanvasConstraint>&>(
-                        m_canvas.getConstraints())[*cid]
-                        = cc;
-                    m_canvas.queue_draw();
+                if (constraintId.has_value()) {
+                    CanvasConstraint canvasConstraint {};
+                    canvasConstraint.id = *constraintId;
+                    canvasConstraint.elementA = elemA;
+                    canvasConstraint.elementB = elemB;
+                    canvasConstraint.value = distance;
+                    canvasConstraint.type = CanvasConstraintType::Distance;
+                    m_canvas.addCanvasConstraint(canvasConstraint);
+                }
+            }
+        } catch (...) {
+            // Invalid number, ignore
+        }
+        dialog->close();
+    });
+
+    // Handle Enter key in entry
+    entry->signal_activate().connect([okBtn]() { okBtn->activate(); });
+
+    dialog->present();
+}
+
+void ModellerView::onAngleConstraintRequested(ElementId elemA, ElementId elemB)
+{
+    // Create a dialog to ask for the angle value in degrees
+    auto* toplevel = dynamic_cast<Gtk::Window*>(get_root());
+    if (!toplevel)
+        return;
+
+    auto dialog = Gtk::make_managed<Gtk::Window>();
+    dialog->set_title("Angle Constraint");
+    dialog->set_transient_for(*toplevel);
+    dialog->set_modal(true);
+    dialog->set_default_size(300, -1);
+
+    auto box = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::VERTICAL, 12);
+    box->set_margin(16);
+
+    auto label = Gtk::make_managed<Gtk::Label>("Enter angle value (degrees):");
+    label->set_halign(Gtk::Align::START);
+    box->append(*label);
+
+    auto entry = Gtk::make_managed<Gtk::Entry>();
+    entry->set_placeholder_text("e.g. 45.0");
+    entry->set_input_purpose(Gtk::InputPurpose::NUMBER);
+    box->append(*entry);
+
+    auto buttonBox
+        = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::HORIZONTAL, 8);
+    buttonBox->set_halign(Gtk::Align::END);
+
+    auto cancelBtn = Gtk::make_managed<Gtk::Button>("Cancel");
+    auto okBtn = Gtk::make_managed<Gtk::Button>("OK");
+    okBtn->add_css_class("suggested-action");
+    buttonBox->append(*cancelBtn);
+    buttonBox->append(*okBtn);
+    box->append(*buttonBox);
+
+    dialog->set_child(*box);
+
+    cancelBtn->signal_clicked().connect([dialog]() { dialog->close(); });
+
+    okBtn->signal_clicked().connect([this, dialog, entry, elemA, elemB]() {
+        auto text = entry->get_text();
+        try {
+            double angleDegrees = std::stod(std::string(text));
+            if (angleDegrees > 0.0 && angleDegrees < 360.0) {
+                auto constraintId
+                    = m_model.addAngleConstraint(elemA, elemB, angleDegrees);
+                if (constraintId.has_value()) {
+                    CanvasConstraint canvasConstraint {};
+                    canvasConstraint.id = *constraintId;
+                    canvasConstraint.elementA = elemA;
+                    canvasConstraint.elementB = elemB;
+                    canvasConstraint.value = angleDegrees;
+                    canvasConstraint.type = CanvasConstraintType::Angle;
+                    m_canvas.addCanvasConstraint(canvasConstraint);
                 }
             }
         } catch (...) {

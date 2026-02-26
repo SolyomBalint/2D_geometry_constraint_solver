@@ -36,6 +36,23 @@ TangencyConstraint::getConstraintValue() const
     return angle;
 }
 
+// AngleConstraint implementation
+AngleConstraint::AngleConstraint(double a)
+    : angle { a }
+{
+}
+
+std::string AngleConstraint::getTypeName() const
+{
+    return "Angle";
+}
+
+std::expected<double, ConstraintError>
+AngleConstraint::getConstraintValue() const
+{
+    return angle;
+}
+
 PointOnLineConstraint::PointOnLineConstraint() { }
 
 std::string PointOnLineConstraint::getTypeName() const

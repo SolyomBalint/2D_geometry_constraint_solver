@@ -64,12 +64,29 @@ public:
     StatusSignal signalStatusChanged();
 
     /**
-     * @brief Signal emitted when a constraint dialog should be shown.
+     * @brief Signal emitted when a distance constraint dialog should
+     *        be shown.
      *
      * The two element IDs are the elements to constrain.
      */
     using ConstraintRequestSignal = sigc::signal<void(ElementId, ElementId)>;
     ConstraintRequestSignal signalConstraintRequested();
+
+    /**
+     * @brief Signal emitted when an angle constraint dialog should
+     *        be shown.
+     *
+     * The two element IDs are the line elements to constrain.
+     */
+    using AngleConstraintRequestSignal
+        = sigc::signal<void(ElementId, ElementId)>;
+    AngleConstraintRequestSignal signalAngleConstraintRequested();
+
+    /**
+     * @brief Add a constraint record to the canvas's visual state.
+     * @param constraint The canvas constraint to add.
+     */
+    void addCanvasConstraint(const CanvasConstraint& constraint);
 
 private:
     // Drawing
@@ -78,6 +95,12 @@ private:
         const Cairo::RefPtr<Cairo::Context>& cr, int width, int height);
     void drawElements(const Cairo::RefPtr<Cairo::Context>& cr);
     void drawConstraints(const Cairo::RefPtr<Cairo::Context>& cr);
+    void drawDistanceConstraint(const Cairo::RefPtr<Cairo::Context>& cr,
+        const CanvasConstraint& constraint, const CanvasElement& elementA,
+        const CanvasElement& elementB, double fontSize);
+    void drawAngleConstraint(const Cairo::RefPtr<Cairo::Context>& cr,
+        const CanvasConstraint& constraint, const CanvasElement& lineA,
+        const CanvasElement& lineB, double fontSize);
     void drawPendingLine(const Cairo::RefPtr<Cairo::Context>& cr);
 
     // Hit testing
@@ -103,6 +126,7 @@ private:
     void handlePointClick(double wx, double wy);
     void handleLineClick(double wx, double wy);
     void handleConstraintClick(double wx, double wy);
+    void handleAngleConstraintClick(double wx, double wy);
     void handleDeleteClick(double wx, double wy);
 
     void updateStatus();
@@ -117,6 +141,7 @@ private:
     // Selection state
     std::optional<ElementId> m_selectedElement;
     std::optional<ElementId> m_constraintFirstElement;
+    std::optional<ElementId> m_angleConstraintFirstElement;
 
     // Line creation state
     bool m_lineFirstPointSet = false;
@@ -145,6 +170,7 @@ private:
     // Signals
     StatusSignal m_statusSignal;
     ConstraintRequestSignal m_constraintRequestSignal;
+    AngleConstraintRequestSignal m_angleConstraintRequestSignal;
 
     // Gesture controllers (prevent premature destruction)
     Glib::RefPtr<Gtk::GestureClick> m_clickGesture;

@@ -59,6 +59,19 @@ public:
         ElementId elemA, ElementId elemB, double distance);
 
     /**
+     * @brief Add an angle constraint between two line elements.
+     * @param elemA First line element ID.
+     * @param elemB Second line element ID.
+     * @param angleDegrees The angle value in degrees.
+     * @return The constraint ID if successful, std::nullopt otherwise.
+     *
+     * Returns std::nullopt if either element is not a line, or if
+     * the elements cannot be found.
+     */
+    std::optional<ConstraintId> addAngleConstraint(
+        ElementId elemA, ElementId elemB, double angleDegrees);
+
+    /**
      * @brief Remove an element and all its associated constraints.
      * @param id The canvas element ID to remove.
      * @return true if the element was found and removed.
@@ -112,12 +125,19 @@ public:
         ConstraintId id) const;
 
     /**
-     * @brief Get the distance value for a constraint.
+     * @brief Get the numeric value for a constraint.
      * @param id The constraint ID.
-     * @return The distance value, or std::nullopt if not a distance
-     *         constraint.
+     * @return The constraint value (distance or angle in radians),
+     *         or std::nullopt if the constraint has no value.
      */
     std::optional<double> getConstraintValue(ConstraintId id) const;
+
+    /**
+     * @brief Check whether a constraint is an angle constraint.
+     * @param id The constraint ID.
+     * @return true if the constraint exists and is an AngleConstraint.
+     */
+    bool isAngleConstraint(ConstraintId id) const;
 
     /**
      * @brief Get all constraint IDs associated with an element.

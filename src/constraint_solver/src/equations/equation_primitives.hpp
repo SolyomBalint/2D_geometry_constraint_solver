@@ -110,6 +110,45 @@ inline auto lineToLineAngle(
 }
 
 /**
+ * @brief Angle constraint for a free line parameterized by its
+ *        unit normal.
+ *
+ * When solving for a free line given a fixed line and a required
+ * angle between them, the free line is parameterized by its unit
+ * normal @c (nx, ny). The free line's direction is the 90-degree
+ * CCW rotation of its normal: @c (-ny, nx).
+ *
+ * The equation enforces:
+ * @c dot(freeDir, fixedDir) = |freeDir| * |fixedDir| * cos(angle)
+ *
+ * Since @c |freeDir| = 1 (the normal is unit), this simplifies to:
+ * @c -ny * fixedDirX + nx * fixedDirY
+ *    - fixedLineLength * cosAngle = 0
+ *
+ * The unknowns @c x and @c y represent the normal vector
+ * components @c nx and @c ny.
+ *
+ * @param fixedDirectionX   X component of the fixed line's
+ *                          direction vector.
+ * @param fixedDirectionY   Y component of the fixed line's
+ *                          direction vector.
+ * @param fixedLineLength   Length of the fixed line's direction
+ *                          vector.
+ * @param cosAngle          Cosine of the required angle between
+ *                          the two lines.
+ * @return Autodiff-compatible lambda @c (dual nx, dual ny) -> dual.
+ */
+inline auto lineNormalAngleConstraint(dual fixedDirectionX,
+    dual fixedDirectionY, dual fixedLineLength, dual cosAngle)
+{
+    return [fixedDirectionX, fixedDirectionY, fixedLineLength, cosAngle](
+               dual nx, dual ny) -> dual {
+        return -ny * fixedDirectionX + nx * fixedDirectionY
+            - fixedLineLength * cosAngle;
+    };
+}
+
+/**
  * @brief Signed distance difference for a line parameterized by its
  *        unit normal.
  *

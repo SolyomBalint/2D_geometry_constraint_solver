@@ -9,6 +9,7 @@
 #include <numbers>
 
 // Constraint solver headers
+#include <constraints.hpp>
 #include <elements.hpp>
 
 namespace Gui {
@@ -20,6 +21,7 @@ namespace {
     constexpr double VIRTUAL_EDGE_LINE_WIDTH = 2.0;
     constexpr double CONSTRAINT_FONT_SIZE = 10.0;
     constexpr double CONSTRAINT_LABEL_OFFSET = 10.0;
+    constexpr double ANGLE_ARC_RADIUS = 20.0;
 
     constexpr std::array<ComponentColor, 8> PALETTE = { {
         { 0.20, 0.40, 0.80 }, // blue
@@ -134,41 +136,132 @@ void renderConstraintGraph(const Cairo::RefPtr<Cairo::Context>& cr,
         if (!elemAResult.has_value() || !elemBResult.has_value())
             continue;
 
-        double ax = 0.0;
-        double ay = 0.0;
-        double bx = 0.0;
-        double by = 0.0;
-        getElementCenter(*elemAResult.value().get(), ax, ay);
-        getElementCenter(*elemBResult.value().get(), bx, by);
+        const auto& elementA = *elemAResult.value().get();
+        const auto& elementB = *elemBResult.value().get();
 
-        // Solid red dashed line for real constraints
-        cr->set_source_rgba(0.8, 0.2, 0.2, 0.7);
-        cr->set_line_width(edgeLineWidth);
-        std::vector<double> dashes = { 6.0 / zoom, 4.0 / zoom };
-        cr->set_dash(dashes, 0);
-        cr->move_to(ax, ay);
-        cr->line_to(bx, by);
-        cr->stroke();
-        cr->unset_dash();
+        double centerAX = 0.0;
+        double centerAY = 0.0;
+        double centerBX = 0.0;
+        double centerBY = 0.0;
+        getElementCenter(elementA, centerAX, centerAY);
+        getElementCenter(elementB, centerBX, centerBY);
 
-        // Draw constraint label at midpoint
         auto constraint = graph.getConstraintForEdge(edge);
-        if (constraint) {
-            auto val = constraint->getConstraintValue();
-            if (val.has_value()) {
-                double mx = (ax + bx) / 2.0;
-                double my = (ay + by) / 2.0;
+        bool isAngle = constraint
+            && constraint->isConstraintType<Gcs::AngleConstraint>();
 
-                cr->set_source_rgb(0.8, 0.1, 0.1);
-                cr->set_font_size(fontSize);
+        if (isAngle && elementA.isElementType<Gcs::Line>()
+            && elementB.isElementType<Gcs::Line>()) {
+            // Draw angle constraint as arc between two lines.
+            const auto& lineA = elementA.getElement<Gcs::Line>();
+            const auto& lineB = elementB.getElement<Gcs::Line>();
 
-                std::string label = std::format("{:.1f}", val.value());
-                Cairo::TextExtents extents;
-                cr->get_text_extents(label, extents);
+            double directionAX = lineA.canvasP2.x() - lineA.canvasP1.x();
+            double directionAY = lineA.canvasP2.y() - lineA.canvasP1.y();
+            double directionBX = lineB.canvasP2.x() - lineB.canvasP1.x();
+            double directionBY = lineB.canvasP2.y() - lineB.canvasP1.y();
 
-                cr->move_to(mx - extents.width / 2.0,
-                    my - CONSTRAINT_LABEL_OFFSET / zoom);
-                cr->show_text(label);
+            double crossProduct
+                = directionAX * directionBY - directionAY * directionBX;
+
+            double intersectionX = 0.0;
+            double intersectionY = 0.0;
+
+            if (std::abs(crossProduct) < 1e-9) {
+                intersectionX = (centerAX + centerBX) / 2.0;
+                intersectionY = (centerAY + centerBY) / 2.0;
+            } else {
+                double deltaOriginX = lineB.canvasP1.x() - lineA.canvasP1.x();
+                double deltaOriginY = lineB.canvasP1.y() - lineA.canvasP1.y();
+                double parameterT
+                    = (deltaOriginX * directionBY - deltaOriginY * directionBX)
+                    / crossProduct;
+                intersectionX = lineA.canvasP1.x() + parameterT * directionAX;
+                intersectionY = lineA.canvasP1.y() + parameterT * directionAY;
+            }
+
+            double angleA = std::atan2(directionAY, directionAX);
+            double angleB = std::atan2(directionBY, directionBX);
+            double angleDifference = angleB - angleA;
+            while (angleDifference > std::numbers::pi) {
+                angleDifference -= 2.0 * std::numbers::pi;
+            }
+            while (angleDifference < -std::numbers::pi) {
+                angleDifference += 2.0 * std::numbers::pi;
+            }
+
+            double arcRadius = ANGLE_ARC_RADIUS / zoom;
+            cr->set_source_rgba(0.1, 0.5, 0.8, 0.8);
+            cr->set_line_width(edgeLineWidth);
+
+            double arcStartAngle = angleA;
+            double arcEndAngle = angleA + angleDifference;
+            if (angleDifference >= 0.0) {
+                cr->arc(intersectionX, intersectionY, arcRadius, arcStartAngle,
+                    arcEndAngle);
+            } else {
+                cr->arc_negative(intersectionX, intersectionY, arcRadius,
+                    arcStartAngle, arcEndAngle);
+            }
+            cr->stroke();
+
+            // Draw angle label
+            if (constraint) {
+                auto constraintValue = constraint->getConstraintValue();
+                if (constraintValue.has_value()) {
+                    double labelAngle = arcStartAngle + angleDifference / 2.0;
+                    double labelRadius
+                        = arcRadius + CONSTRAINT_LABEL_OFFSET / zoom;
+                    double labelX
+                        = intersectionX + labelRadius * std::cos(labelAngle);
+                    double labelY
+                        = intersectionY + labelRadius * std::sin(labelAngle);
+
+                    cr->set_source_rgb(0.1, 0.4, 0.7);
+                    cr->set_font_size(fontSize);
+
+                    double angleDegrees
+                        = constraintValue.value() * 180.0 / std::numbers::pi;
+                    std::string label
+                        = std::format("{:.1f}\u00B0", angleDegrees);
+                    Cairo::TextExtents extents;
+                    cr->get_text_extents(label, extents);
+
+                    cr->move_to(labelX - extents.width / 2.0,
+                        labelY + extents.height / 2.0);
+                    cr->show_text(label);
+                }
+            }
+        } else {
+            // Draw standard dashed line for distance constraints
+            cr->set_source_rgba(0.8, 0.2, 0.2, 0.7);
+            cr->set_line_width(edgeLineWidth);
+            std::vector<double> dashes = { 6.0 / zoom, 4.0 / zoom };
+            cr->set_dash(dashes, 0);
+            cr->move_to(centerAX, centerAY);
+            cr->line_to(centerBX, centerBY);
+            cr->stroke();
+            cr->unset_dash();
+
+            // Draw constraint label at midpoint
+            if (constraint) {
+                auto constraintValue = constraint->getConstraintValue();
+                if (constraintValue.has_value()) {
+                    double midpointX = (centerAX + centerBX) / 2.0;
+                    double midpointY = (centerAY + centerBY) / 2.0;
+
+                    cr->set_source_rgb(0.8, 0.1, 0.1);
+                    cr->set_font_size(fontSize);
+
+                    std::string label
+                        = std::format("{:.1f}", constraintValue.value());
+                    Cairo::TextExtents extents;
+                    cr->get_text_extents(label, extents);
+
+                    cr->move_to(midpointX - extents.width / 2.0,
+                        midpointY - CONSTRAINT_LABEL_OFFSET / zoom);
+                    cr->show_text(label);
+                }
             }
         }
     }
