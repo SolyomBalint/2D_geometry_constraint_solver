@@ -103,7 +103,7 @@ std::array<Eigen::Vector2d, 2> solve2D(
 
 /// @brief Default initial guesses for spatial-coordinate unknowns.
 inline const std::array<Eigen::Vector2d, 2> DEFAULT_SPATIAL_GUESSES {
-    Eigen::Vector2d { 2000.0, 2000.0 }, Eigen::Vector2d { -2000.0, -2000.0 }
+    Eigen::Vector2d { 20000.0, 20000.0 }, Eigen::Vector2d { -20000.0, -20000.0 }
 };
 
 /**

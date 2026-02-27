@@ -21,6 +21,7 @@ namespace {
 MainWindow::MainWindow()
     : m_modellerView(m_model)
     , m_decompositionView(m_model)
+    , m_solvingView(m_model)
 {
     set_title("2D Geometry Constraint Solver");
     set_default_size(1280, 800);
@@ -48,6 +49,7 @@ MainWindow::MainWindow()
     // Add views to the stack
     m_stack.add(m_modellerView, "modeller", "Modeller");
     m_stack.add(m_decompositionView, "decomposition", "Decomposition View");
+    m_stack.add(m_solvingView, "solving", "Solving View");
 
     m_stack.set_transition_type(Gtk::StackTransitionType::SLIDE_LEFT_RIGHT);
 

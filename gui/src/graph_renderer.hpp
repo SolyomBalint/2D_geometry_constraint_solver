@@ -120,6 +120,43 @@ void renderConstraintGraphAsGraph(const Cairo::RefPtr<Cairo::Context>& cr,
     double componentColorB = 0.2, const OriginalIdMap* originalIds = nullptr);
 
 /**
+ * @brief Compute the bounding box of all solved elements in a
+ *        constraint graph using solver-space positions.
+ *
+ * Only elements where @c isElementSet() is true are included.
+ * For Point elements, uses @c position; for Line elements, uses
+ * @c p1 and @c p2.
+ *
+ * @param graph The constraint graph whose solved elements to measure.
+ * @return The axis-aligned bounding box. If no elements are solved,
+ *         returns a zero-size box at the origin.
+ */
+BoundingBox computeSolverSpaceBoundingBox(const Gcs::ConstraintGraph& graph);
+
+/**
+ * @brief Render a constraint graph using solver-space positions.
+ *
+ * Same visual style as @c renderConstraintGraph() but reads
+ * @c Point::position and @c Line::p1/@c p2 instead of canvas
+ * positions. Only elements where @c isElementSet() is true are
+ * drawn. Constraint edges are drawn between solved element
+ * centers in solver space.
+ *
+ * @param cr The Cairo context to draw into.
+ * @param graph The constraint graph to render.
+ * @param zoom The current zoom level.
+ * @param componentColorR Red component [0,1] for the component tint.
+ * @param componentColorG Green component [0,1] for the component tint.
+ * @param componentColorB Blue component [0,1] for the component tint.
+ * @param dimmed When true, renders at reduced opacity (for
+ *        previously solved components).
+ */
+void renderConstraintGraphSolverSpace(const Cairo::RefPtr<Cairo::Context>& cr,
+    const Gcs::ConstraintGraph& graph, double zoom,
+    double componentColorR = 0.2, double componentColorG = 0.2,
+    double componentColorB = 0.2, bool dimmed = false);
+
+/**
  * @brief A set of distinct colors for distinguishing components.
  *
  * Each entry is an {R, G, B} triplet with values in [0, 1].

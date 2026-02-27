@@ -44,10 +44,17 @@ void Application::loadCss()
     // Minimal CSS for the application
     auto cssData
         = Glib::ustring("window { background-color: @window_bg_color; }"
-                        ".toolbar { background-color: @headerbar_bg_color; "
+                        ".toolbar { "
+                        "  background-color: @headerbar_bg_color; "
+                        "  background-image: none; "
                         "  border-bottom: 1px solid @borders; "
-                        "  padding: 4px; }"
-                        "drawingarea { background-color: white; }");
+                        "  padding: 4px; "
+                        "  opacity: 1.0; }"
+                        "drawingarea { background-color: white; }"
+                        ".solver-sidebar { "
+                        "  background-color: @window_bg_color; "
+                        "  background-image: none; "
+                        "  opacity: 1.0; }");
 
     cssProvider->load_from_string(cssData);
 

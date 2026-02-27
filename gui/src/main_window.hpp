@@ -8,6 +8,7 @@
 #include "./constraint_model.hpp"
 #include "./decomposition_view.hpp"
 #include "./modeller_view.hpp"
+#include "./solving_view.hpp"
 
 // Thirdparty headers
 #include <gtkmm.h>
@@ -52,6 +53,7 @@ private:
 
     ModellerView m_modellerView;
     DecompositionView m_decompositionView;
+    SolvingView m_solvingView;
 
     // Save / Load buttons
     Gtk::Button m_saveBtn;

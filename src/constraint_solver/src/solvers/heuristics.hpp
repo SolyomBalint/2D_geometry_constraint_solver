@@ -18,8 +18,8 @@ namespace Gcs::Solvers {
 inline double triangleOrientation(const Eigen::Vector2d& a,
     const Eigen::Vector2d& b, const Eigen::Vector2d& c)
 {
-    return (b.x() - a.x()) * (c.y() - a.y())
-        - (b.y() - a.y()) * (c.x() - a.x());
+    return ((b.x() - a.x()) * (c.y() - a.y()))
+        - ((b.y() - a.y()) * (c.x() - a.x()));
 }
 
 /**
@@ -114,8 +114,8 @@ inline double signedDistanceToLine(const Eigen::Vector2d& point,
     Eigen::Vector2d pointToLineP1 = point - lineP1;
 
     // Cross product: lineDirection x pointToLineP1
-    double crossProduct = lineDirection.x() * pointToLineP1.y()
-        - lineDirection.y() * pointToLineP1.x();
+    double crossProduct = (lineDirection.x() * pointToLineP1.y())
+        - (lineDirection.y() * pointToLineP1.x());
 
     return crossProduct / lineLength;
 }
@@ -205,8 +205,8 @@ inline Eigen::Vector2d pickLineNormalByAngleOrientation(
 {
     // Cross product: fixedDir x freeDir
     double canvasCrossProduct
-        = canvasFixedLineDirection.x() * canvasFreeLineDirection.y()
-        - canvasFixedLineDirection.y() * canvasFreeLineDirection.x();
+        = (canvasFixedLineDirection.x() * canvasFreeLineDirection.y())
+        - (canvasFixedLineDirection.y() * canvasFreeLineDirection.x());
 
     // Candidate 0's free line direction is the 90-degree CCW
     // rotation of its normal: (-ny, nx)
@@ -221,8 +221,8 @@ inline Eigen::Vector2d pickLineNormalByAngleOrientation(
     // magnitude and sign. We use the canvas fixed direction for the
     // cross product since what matters is the sign relationship.
     double candidateCrossProduct0
-        = canvasFixedLineDirection.x() * candidateFreeDirection0.y()
-        - canvasFixedLineDirection.y() * candidateFreeDirection0.x();
+        = (canvasFixedLineDirection.x() * candidateFreeDirection0.y())
+        - (canvasFixedLineDirection.y() * candidateFreeDirection0.x());
 
     auto sign = [](double x) { return (x > 0) - (x < 0); };
 

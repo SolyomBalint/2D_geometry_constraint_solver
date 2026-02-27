@@ -759,6 +759,386 @@ void renderConstraintGraphAsGraph(const Cairo::RefPtr<Cairo::Context>& cr,
     }
 }
 
+BoundingBox computeSolverSpaceBoundingBox(const Gcs::ConstraintGraph& graph)
+{
+    double minX = std::numeric_limits<double>::max();
+    double minY = std::numeric_limits<double>::max();
+    double maxX = std::numeric_limits<double>::lowest();
+    double maxY = std::numeric_limits<double>::lowest();
+
+    bool hasElements = false;
+
+    const auto& elementMap = graph.getElementMap();
+    for (const auto& node : graph.getGraph().getNodes()) {
+        auto elemResult = elementMap.get(node);
+        if (!elemResult.has_value())
+            continue;
+
+        const auto& elem = *elemResult.value().get();
+        if (!elem.isElementSet())
+            continue;
+
+        hasElements = true;
+
+        if (elem.isElementType<Gcs::Point>()) {
+            const auto& point = elem.getElement<Gcs::Point>();
+            double px = point.position.x();
+            double py = point.position.y();
+            minX = std::min(minX, px);
+            minY = std::min(minY, py);
+            maxX = std::max(maxX, px);
+            maxY = std::max(maxY, py);
+        } else if (elem.isElementType<Gcs::Line>()) {
+            const auto& line = elem.getElement<Gcs::Line>();
+            minX = std::min({ minX, line.p1.x(), line.p2.x() });
+            minY = std::min({ minY, line.p1.y(), line.p2.y() });
+            maxX = std::max({ maxX, line.p1.x(), line.p2.x() });
+            maxY = std::max({ maxY, line.p1.y(), line.p2.y() });
+        } else if (elem.isElementType<Gcs::FixedRadiusCircle>()) {
+            const auto& circle = elem.getElement<Gcs::FixedRadiusCircle>();
+            double cx = circle.position.x();
+            double cy = circle.position.y();
+            double r = circle.fixedRadius;
+            minX = std::min(minX, cx - r);
+            minY = std::min(minY, cy - r);
+            maxX = std::max(maxX, cx + r);
+            maxY = std::max(maxY, cy + r);
+        }
+    }
+
+    if (!hasElements) {
+        return { 0.0, 0.0, 0.0, 0.0 };
+    }
+
+    constexpr double PADDING = 20.0;
+    return { minX - PADDING, minY - PADDING, maxX + PADDING, maxY + PADDING };
+}
+
+namespace {
+    /**
+     * @brief Get the solver-space center of an element.
+     * @param elem The element to query.
+     * @param[out] cx Center x coordinate in solver space.
+     * @param[out] cy Center y coordinate in solver space.
+     */
+    void getElementSolverCenter(
+        const Gcs::Element& elem, double& cx, double& cy)
+    {
+        if (elem.isElementType<Gcs::Point>()) {
+            const auto& point = elem.getElement<Gcs::Point>();
+            cx = point.position.x();
+            cy = point.position.y();
+        } else if (elem.isElementType<Gcs::Line>()) {
+            const auto& line = elem.getElement<Gcs::Line>();
+            cx = (line.p1.x() + line.p2.x()) / 2.0;
+            cy = (line.p1.y() + line.p2.y()) / 2.0;
+        } else if (elem.isElementType<Gcs::FixedRadiusCircle>()) {
+            const auto& circle = elem.getElement<Gcs::FixedRadiusCircle>();
+            cx = circle.position.x();
+            cy = circle.position.y();
+        }
+    }
+} // namespace
+
+void renderConstraintGraphSolverSpace(const Cairo::RefPtr<Cairo::Context>& cr,
+    const Gcs::ConstraintGraph& graph, double zoom, double componentColorR,
+    double componentColorG, double componentColorB, bool dimmed)
+{
+    const auto& simpleGraph = graph.getGraph();
+    const auto& elementMap = graph.getElementMap();
+
+    double alpha = dimmed ? 0.35 : 1.0;
+
+    double pointRadius = POINT_RADIUS / zoom;
+    double lineWidth = LINE_WIDTH / zoom;
+    double edgeLineWidth = EDGE_LINE_WIDTH / zoom;
+    double virtualEdgeLineWidth = VIRTUAL_EDGE_LINE_WIDTH / zoom;
+    double fontSize = CONSTRAINT_FONT_SIZE / zoom;
+
+    // ---- Draw real constraint edges first (underneath) ----
+    for (const auto& edge : simpleGraph.getEdges()) {
+        if (graph.isVirtualEdge(edge))
+            continue;
+
+        auto [nodeA, nodeB] = simpleGraph.getEndpoints(edge);
+
+        auto elemAResult = elementMap.get(nodeA);
+        auto elemBResult = elementMap.get(nodeB);
+        if (!elemAResult.has_value() || !elemBResult.has_value())
+            continue;
+
+        const auto& elementA = *elemAResult.value().get();
+        const auto& elementB = *elemBResult.value().get();
+
+        // Skip edges where either endpoint is unsolved
+        if (!elementA.isElementSet() || !elementB.isElementSet())
+            continue;
+
+        double centerAX = 0.0;
+        double centerAY = 0.0;
+        double centerBX = 0.0;
+        double centerBY = 0.0;
+        getElementSolverCenter(elementA, centerAX, centerAY);
+        getElementSolverCenter(elementB, centerBX, centerBY);
+
+        auto constraint = graph.getConstraintForEdge(edge);
+        bool isAngle = constraint
+            && constraint->isConstraintType<Gcs::AngleConstraint>();
+
+        if (isAngle && elementA.isElementType<Gcs::Line>()
+            && elementB.isElementType<Gcs::Line>()) {
+            // Draw angle constraint arc in solver space
+            const auto& lineA = elementA.getElement<Gcs::Line>();
+            const auto& lineB = elementB.getElement<Gcs::Line>();
+
+            double dirAX = lineA.p2.x() - lineA.p1.x();
+            double dirAY = lineA.p2.y() - lineA.p1.y();
+            double dirBX = lineB.p2.x() - lineB.p1.x();
+            double dirBY = lineB.p2.y() - lineB.p1.y();
+
+            double cross = dirAX * dirBY - dirAY * dirBX;
+
+            double iX = 0.0;
+            double iY = 0.0;
+
+            if (std::abs(cross) < 1e-9) {
+                iX = (centerAX + centerBX) / 2.0;
+                iY = (centerAY + centerBY) / 2.0;
+            } else {
+                double dOX = lineB.p1.x() - lineA.p1.x();
+                double dOY = lineB.p1.y() - lineA.p1.y();
+                double t = (dOX * dirBY - dOY * dirBX) / cross;
+                iX = lineA.p1.x() + t * dirAX;
+                iY = lineA.p1.y() + t * dirAY;
+            }
+
+            double angleA = std::atan2(dirAY, dirAX);
+            double angleB = std::atan2(dirBY, dirBX);
+            double angleDiff = angleB - angleA;
+            while (angleDiff > std::numbers::pi)
+                angleDiff -= 2.0 * std::numbers::pi;
+            while (angleDiff < -std::numbers::pi)
+                angleDiff += 2.0 * std::numbers::pi;
+
+            auto constraintValue = constraint->getConstraintValue();
+            if (constraintValue.has_value()) {
+                double constraintRad = constraintValue.value();
+                double defArc = std::abs(angleDiff);
+                double supArc = std::numbers::pi - defArc;
+                if (std::abs(supArc - constraintRad)
+                    < std::abs(defArc - constraintRad)) {
+                    dirAX = -dirAX;
+                    dirAY = -dirAY;
+                    angleA = std::atan2(dirAY, dirAX);
+                    angleDiff = angleB - angleA;
+                    while (angleDiff > std::numbers::pi)
+                        angleDiff -= 2.0 * std::numbers::pi;
+                    while (angleDiff < -std::numbers::pi)
+                        angleDiff += 2.0 * std::numbers::pi;
+                }
+            }
+
+            double arcRadius = ANGLE_ARC_RADIUS / zoom;
+            cr->set_source_rgba(0.1, 0.5, 0.8, 0.8 * alpha);
+            cr->set_line_width(edgeLineWidth);
+
+            cr->begin_new_sub_path();
+            if (angleDiff >= 0.0) {
+                cr->arc(iX, iY, arcRadius, angleA, angleA + angleDiff);
+            } else {
+                cr->arc_negative(iX, iY, arcRadius, angleA, angleA + angleDiff);
+            }
+            cr->stroke();
+
+            // Angle label
+            if (constraintValue.has_value()) {
+                double lblAngle = angleA + angleDiff / 2.0;
+                double lblR = arcRadius + CONSTRAINT_LABEL_OFFSET / zoom;
+                double lblX = iX + lblR * std::cos(lblAngle);
+                double lblY = iY + lblR * std::sin(lblAngle);
+
+                cr->set_source_rgba(0.1, 0.4, 0.7, alpha);
+                cr->set_font_size(fontSize);
+
+                double deg = constraintValue.value() * 180.0 / std::numbers::pi;
+                std::string label = std::format("{:.1f}\u00B0", deg);
+                Cairo::TextExtents extents;
+                cr->get_text_extents(label, extents);
+                cr->move_to(
+                    lblX - extents.width / 2.0, lblY + extents.height / 2.0);
+                cr->show_text(label);
+            }
+        } else {
+            // Distance constraint - dashed line
+            double drawAX = centerAX;
+            double drawAY = centerAY;
+            double drawBX = centerBX;
+            double drawBY = centerBY;
+
+            // Point-line perpendicular foot in solver space
+            if (elementA.isElementType<Gcs::Line>()
+                && elementB.isElementType<Gcs::Point>()) {
+                const auto& line = elementA.getElement<Gcs::Line>();
+                double dx = line.p2.x() - line.p1.x();
+                double dy = line.p2.y() - line.p1.y();
+                double lenSq = dx * dx + dy * dy;
+                if (lenSq > 1e-12) {
+                    double t = ((drawBX - line.p1.x()) * dx
+                                   + (drawBY - line.p1.y()) * dy)
+                        / lenSq;
+                    drawAX = line.p1.x() + t * dx;
+                    drawAY = line.p1.y() + t * dy;
+                }
+            } else if (elementB.isElementType<Gcs::Line>()
+                && elementA.isElementType<Gcs::Point>()) {
+                const auto& line = elementB.getElement<Gcs::Line>();
+                double dx = line.p2.x() - line.p1.x();
+                double dy = line.p2.y() - line.p1.y();
+                double lenSq = dx * dx + dy * dy;
+                if (lenSq > 1e-12) {
+                    double t = ((drawAX - line.p1.x()) * dx
+                                   + (drawAY - line.p1.y()) * dy)
+                        / lenSq;
+                    drawBX = line.p1.x() + t * dx;
+                    drawBY = line.p1.y() + t * dy;
+                }
+            }
+
+            cr->set_source_rgba(0.8, 0.2, 0.2, 0.7 * alpha);
+            cr->set_line_width(edgeLineWidth);
+            std::vector<double> dashes = { 6.0 / zoom, 4.0 / zoom };
+            cr->set_dash(dashes, 0);
+            cr->move_to(drawAX, drawAY);
+            cr->line_to(drawBX, drawBY);
+            cr->stroke();
+            cr->unset_dash();
+
+            // Distance label
+            if (constraint) {
+                auto cval = constraint->getConstraintValue();
+                if (cval.has_value()) {
+                    double mx = (drawAX + drawBX) / 2.0;
+                    double my = (drawAY + drawBY) / 2.0;
+                    cr->set_source_rgba(0.8, 0.1, 0.1, alpha);
+                    cr->set_font_size(fontSize);
+                    std::string label = std::format("{:.1f}", cval.value());
+                    Cairo::TextExtents extents;
+                    cr->get_text_extents(label, extents);
+                    cr->move_to(mx - extents.width / 2.0,
+                        my - CONSTRAINT_LABEL_OFFSET / zoom);
+                    cr->show_text(label);
+                }
+            }
+        }
+    }
+
+    // ---- Draw virtual edges ----
+    for (const auto& edge : simpleGraph.getEdges()) {
+        if (!graph.isVirtualEdge(edge))
+            continue;
+
+        auto [nodeA, nodeB] = simpleGraph.getEndpoints(edge);
+        auto elemAResult = elementMap.get(nodeA);
+        auto elemBResult = elementMap.get(nodeB);
+        if (!elemAResult.has_value() || !elemBResult.has_value())
+            continue;
+
+        const auto& eA = *elemAResult.value().get();
+        const auto& eB = *elemBResult.value().get();
+        if (!eA.isElementSet() || !eB.isElementSet())
+            continue;
+
+        double ax = 0.0;
+        double ay = 0.0;
+        double bx = 0.0;
+        double by = 0.0;
+        getElementSolverCenter(eA, ax, ay);
+        getElementSolverCenter(eB, bx, by);
+
+        cr->set_source_rgba(0.55, 0.20, 0.80, 0.85 * alpha);
+        cr->set_line_width(virtualEdgeLineWidth);
+        std::vector<double> dashes = { 8.0 / zoom, 4.0 / zoom };
+        cr->set_dash(dashes, 0);
+        cr->move_to(ax, ay);
+        cr->line_to(bx, by);
+        cr->stroke();
+        cr->unset_dash();
+
+        double mx = (ax + bx) / 2.0;
+        double my = (ay + by) / 2.0;
+        cr->set_source_rgba(0.55, 0.20, 0.80, alpha);
+        cr->set_font_size(fontSize);
+        Cairo::TextExtents extents;
+        cr->get_text_extents("V", extents);
+        cr->move_to(
+            mx - extents.width / 2.0, my - CONSTRAINT_LABEL_OFFSET / zoom);
+        cr->show_text("V");
+    }
+
+    // ---- Draw elements on top ----
+    for (const auto& node : simpleGraph.getNodes()) {
+        auto elemResult = elementMap.get(node);
+        if (!elemResult.has_value())
+            continue;
+
+        const auto& elem = *elemResult.value().get();
+        if (!elem.isElementSet())
+            continue;
+
+        if (elem.isElementType<Gcs::Point>()) {
+            const auto& point = elem.getElement<Gcs::Point>();
+            double px = point.position.x();
+            double py = point.position.y();
+
+            cr->set_source_rgba(
+                componentColorR, componentColorG, componentColorB, alpha);
+            cr->arc(px, py, pointRadius, 0, 2.0 * std::numbers::pi);
+            cr->fill();
+
+            cr->set_source_rgba(0.0, 0.0, 0.0, alpha);
+            cr->set_line_width(1.0 / zoom);
+            cr->arc(px, py, pointRadius, 0, 2.0 * std::numbers::pi);
+            cr->stroke();
+
+        } else if (elem.isElementType<Gcs::Line>()) {
+            const auto& line = elem.getElement<Gcs::Line>();
+
+            cr->set_source_rgba(
+                componentColorR, componentColorG, componentColorB, alpha);
+            cr->set_line_width(lineWidth);
+            cr->move_to(line.p1.x(), line.p1.y());
+            cr->line_to(line.p2.x(), line.p2.y());
+            cr->stroke();
+
+            double epRadius = pointRadius * 0.6;
+            cr->set_source_rgba(componentColorR * 0.8, componentColorG * 0.8,
+                componentColorB * 0.8, alpha);
+            cr->arc(
+                line.p1.x(), line.p1.y(), epRadius, 0, 2.0 * std::numbers::pi);
+            cr->fill();
+            cr->arc(
+                line.p2.x(), line.p2.y(), epRadius, 0, 2.0 * std::numbers::pi);
+            cr->fill();
+
+        } else if (elem.isElementType<Gcs::FixedRadiusCircle>()) {
+            const auto& circle = elem.getElement<Gcs::FixedRadiusCircle>();
+
+            cr->set_source_rgba(
+                componentColorR, componentColorG, componentColorB, alpha);
+            cr->set_line_width(lineWidth);
+            cr->arc(circle.position.x(), circle.position.y(),
+                circle.fixedRadius, 0, 2.0 * std::numbers::pi);
+            cr->stroke();
+
+            cr->set_source_rgba(componentColorR * 0.8, componentColorG * 0.8,
+                componentColorB * 0.8, alpha);
+            cr->arc(circle.position.x(), circle.position.y(), pointRadius * 0.5,
+                0, 2.0 * std::numbers::pi);
+            cr->fill();
+        }
+    }
+}
+
 ComponentColor getComponentColor(int index)
 {
     return PALETTE[static_cast<std::size_t>(index) % PALETTE.size()];
