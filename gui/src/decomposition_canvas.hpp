@@ -44,9 +44,6 @@ public:
 private:
     void onDraw(const Cairo::RefPtr<Cairo::Context>& cr, int width, int height);
 
-    void drawGrid(
-        const Cairo::RefPtr<Cairo::Context>& cr, int width, int height);
-
     // Coordinate transforms
     void screenToWorld(double sx, double sy, double& wx, double& wy) const;
 
@@ -58,6 +55,11 @@ private:
     void onMotion(double x, double y);
 
     std::vector<Gcs::ConstraintGraph> m_leafGraphs;
+    OriginalIdMap m_originalIds; ///< Element* -> original node ID.
+
+    // Grid layout for tiling leaf components
+    double m_cellSize = 0.0; ///< Size of each grid cell (square).
+    int m_gridCols = 0; ///< Number of columns in the grid.
 
     // Pan and zoom
     double m_panX = 0.0;

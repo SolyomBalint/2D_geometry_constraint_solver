@@ -52,3 +52,4 @@ CMakeUserPresets.json
 opencode.json
 src/structures/build_structures
 AGENTS.md
+gui/models

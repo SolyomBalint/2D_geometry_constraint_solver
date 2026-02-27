@@ -26,7 +26,8 @@ target_link_libraries(gcs_gui PRIVATE
     constraint_solver
     spdlog::spdlog
     PkgConfig::GTKMM
-    Eigen3::Eigen)
+    Eigen3::Eigen
+    nlohmann_json::nlohmann_json)
 
 target_compile_definitions(gcs_gui PRIVATE SPDLOG_USE_STD_FORMAT)
 

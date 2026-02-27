@@ -37,8 +37,9 @@ TangencyConstraint::getConstraintValue() const
 }
 
 // AngleConstraint implementation
-AngleConstraint::AngleConstraint(double a)
+AngleConstraint::AngleConstraint(double a, bool flip)
     : angle { a }
+    , flipOrientation { flip }
 {
 }
 

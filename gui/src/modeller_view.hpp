@@ -4,6 +4,7 @@
 // Custom headers
 #include "./canvas.hpp"
 #include "./constraint_model.hpp"
+#include "./model_serializer.hpp"
 
 // Thirdparty headers
 #include <gtkmm.h>
@@ -22,6 +23,24 @@ class ModellerView : public Gtk::Box {
 public:
     explicit ModellerView(ConstraintModel& model);
 
+    /** @brief Get the canvas (for serialization). */
+    [[nodiscard]] const Canvas& getCanvas() const;
+
+    /** @brief Get the canvas (mutable, for loading). */
+    Canvas& getCanvas();
+
+    /**
+     * @brief Clear the canvas and rebuild from deserialized data.
+     *
+     * Clears the canvas visual state, then replays element and
+     * constraint creation commands through the model, rebuilding
+     * both the constraint graph and the canvas visual records.
+     *
+     * @param data The deserialized model data to load.
+     * @return Empty string on success, or an error description.
+     */
+    std::string loadModelData(const ModelData& data);
+
 private:
     void buildToolbar();
     void buildStatusBar();
@@ -29,6 +48,8 @@ private:
     void onToolChanged(Tool tool);
     void onConstraintRequested(ElementId elemA, ElementId elemB);
     void onAngleConstraintRequested(ElementId elemA, ElementId elemB);
+    void onAngleConstraintConfirmed(
+        ElementId elemA, ElementId elemB, double angleDegrees, bool flipped);
     void onSolveClicked();
     void onStatusChanged(const Glib::ustring& status);
 

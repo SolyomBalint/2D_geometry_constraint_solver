@@ -313,9 +313,17 @@ SolveResult ZeroFixedLLPAngleTriangleSolver::solve(ConstraintGraph& component)
     // --------------------------------------------------------
     // Step 4: Disambiguate by comparing the angular
     // orientation (cross product sign) with the canvas layout.
+    // If flipOrientation is set, negate one direction to pick
+    // the opposite side.
     // --------------------------------------------------------
     Eigen::Vector2d canvasFreeLineDirection
         = line2Data.canvasP2 - line2Data.canvasP1;
+
+    const auto* angleData
+        = lineToLineAngleConstraint->getConstraintAs<AngleConstraint>();
+    if (angleData != nullptr && angleData->flipOrientation) {
+        canvasFreeLineDirection = -canvasFreeLineDirection;
+    }
 
     Eigen::Vector2d chosenNormal
         = pickLineNormalByAngleOrientation(canvasLine1Direction,
@@ -495,9 +503,17 @@ SolveResult FixedLineAndPointFreeLineSolver::solve(ConstraintGraph& component)
     // --------------------------------------------------------
     // Step 2: Disambiguate by comparing the angular
     // orientation (cross product sign) with the canvas layout.
+    // If flipOrientation is set, negate one direction to pick
+    // the opposite side.
     // --------------------------------------------------------
     Eigen::Vector2d canvasFixedLineDirection
         = fixedLineData.canvasP2 - fixedLineData.canvasP1;
+
+    const auto* angleData
+        = lineToLineAngleConstraint->getConstraintAs<AngleConstraint>();
+    if (angleData != nullptr && angleData->flipOrientation) {
+        canvasFreeLineDirection = -canvasFreeLineDirection;
+    }
 
     Eigen::Vector2d chosenNormal
         = pickLineNormalByAngleOrientation(canvasFixedLineDirection,

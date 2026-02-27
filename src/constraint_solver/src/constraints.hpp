@@ -53,8 +53,11 @@ struct TangencyConstraint {
 
 struct AngleConstraint {
     double angle;
+    /// When true, the solver flips the orientation heuristic so the
+    /// angle is enforced on the opposite side of the two lines.
+    bool flipOrientation = false;
 
-    explicit AngleConstraint(double a);
+    explicit AngleConstraint(double a, bool flip = false);
 
     std::string getTypeName() const;
     std::expected<double, ConstraintError> getConstraintValue() const;
@@ -96,6 +99,21 @@ public:
     bool isConstraintType() const
     {
         return std::holds_alternative<T>(m_constraint);
+    }
+
+    /// @brief Access the underlying constraint variant as a specific
+    ///        type. Returns nullptr if the type does not match.
+    template <typename T>
+    const T* getConstraintAs() const
+    {
+        return std::get_if<T>(&m_constraint);
+    }
+
+    /// @brief Mutable access to the underlying constraint variant.
+    template <typename T>
+    T* getConstraintAs()
+    {
+        return std::get_if<T>(&m_constraint);
     }
 
     std::string getConstraintName() const;

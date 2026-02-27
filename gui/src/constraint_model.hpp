@@ -32,6 +32,15 @@ public:
     ConstraintModel();
 
     /**
+     * @brief Clear all elements, constraints, and mappings.
+     *
+     * Resets the model to an empty state: the constraint graph is
+     * replaced with a fresh default-constructed one, all ID mappings
+     * are cleared, and the next-ID counters are reset to zero.
+     */
+    void clear();
+
+    /**
      * @brief Add a point to the constraint graph.
      * @param canvasPos The position on the canvas.
      * @return The canvas element ID assigned to the new point.
@@ -63,13 +72,15 @@ public:
      * @param elemA First line element ID.
      * @param elemB Second line element ID.
      * @param angleDegrees The angle value in degrees.
+     * @param flipOrientation When true, the solver enforces the
+     *        angle on the opposite side of the two lines.
      * @return The constraint ID if successful, std::nullopt otherwise.
      *
      * Returns std::nullopt if either element is not a line, or if
      * the elements cannot be found.
      */
-    std::optional<ConstraintId> addAngleConstraint(
-        ElementId elemA, ElementId elemB, double angleDegrees);
+    std::optional<ConstraintId> addAngleConstraint(ElementId elemA,
+        ElementId elemB, double angleDegrees, bool flipOrientation = false);
 
     /**
      * @brief Remove an element and all its associated constraints.

@@ -76,6 +76,7 @@ private:
 
     MathUtils::BinaryTree<Gcs::ConstraintGraph> m_stree;
     std::unordered_map<MathUtils::TreeNodeId, NodeLayout> m_layout;
+    OriginalIdMap m_originalIds; ///< Element* -> root node ID.
 
     // Pan and zoom
     double m_panX = 0.0;

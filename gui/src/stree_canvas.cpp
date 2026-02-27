@@ -64,6 +64,15 @@ void STreeCanvas::setDecomposition(
     const MathUtils::BinaryTree<Gcs::ConstraintGraph>& stree)
 {
     m_stree = stree;
+
+    // Build original-ID map from the root graph.
+    auto root = m_stree.getRoot();
+    if (root.has_value()) {
+        m_originalIds = buildOriginalIdMap(m_stree.getValue(*root));
+    } else {
+        m_originalIds.clear();
+    }
+
     computeLayout();
 
     // Center the view on the tree layout
@@ -112,6 +121,7 @@ void STreeCanvas::clear()
 {
     m_stree = {};
     m_layout.clear();
+    m_originalIds.clear();
     m_panX = 0.0;
     m_panY = 0.0;
     m_zoom = 1.0;
@@ -324,8 +334,8 @@ void STreeCanvas::drawTreeNodes(const Cairo::RefPtr<Cairo::Context>& cr)
         cr->line_to(left + layout.width - NODE_PADDING / m_zoom, headerLineY);
         cr->stroke();
 
-        // Render the miniature graph inside the node box
-        // The graph area is below the header
+        // Render the miniature abstract graph inside the node box.
+        // The graph area is below the header.
         double graphAreaLeft = left + NODE_PADDING / m_zoom;
         double graphAreaTop = headerLineY + 2.0 / m_zoom;
         double graphAreaWidth = layout.width - 2.0 * NODE_PADDING / m_zoom;
@@ -334,19 +344,19 @@ void STreeCanvas::drawTreeNodes(const Cairo::RefPtr<Cairo::Context>& cr)
 
         if (graphAreaWidth > 0 && graphAreaHeight > 0
             && graph.nodeCount() > 0) {
-            auto bbox = computeBoundingBox(graph);
+            auto bbox = computeAbstractBoundingBox(graph);
 
             if (bbox.width() > 0 && bbox.height() > 0) {
-                // Compute scale to fit the graph into the node box
+                // Compute scale to fit the abstract layout into the
+                // node box
                 double scaleX = graphAreaWidth / bbox.width();
                 double scaleY = graphAreaHeight / bbox.height();
                 double scale = std::min(scaleX, scaleY) * 0.85;
 
-                // Compute translation to center the graph in the box
-                double graphCenterX = bbox.centerX();
-                double graphCenterY = bbox.centerY();
-                double areaCenter_x = graphAreaLeft + graphAreaWidth / 2.0;
-                double areaCenter_y = graphAreaTop + graphAreaHeight / 2.0;
+                // The abstract layout is centered at origin, so we
+                // just translate to the area center and scale.
+                double areaCenterX = graphAreaLeft + graphAreaWidth / 2.0;
+                double areaCenterY = graphAreaTop + graphAreaHeight / 2.0;
 
                 cr->save();
 
@@ -355,21 +365,20 @@ void STreeCanvas::drawTreeNodes(const Cairo::RefPtr<Cairo::Context>& cr)
                     graphAreaHeight);
                 cr->clip();
 
-                // Translate and scale to fit the graph
-                cr->translate(areaCenter_x, areaCenter_y);
+                // Translate to area center and scale to fit
+                cr->translate(areaCenterX, areaCenterY);
                 cr->scale(scale, scale);
-                cr->translate(-graphCenterX, -graphCenterY);
 
                 // The effective zoom for line width calculations
                 double effectiveZoom = m_zoom * scale;
 
                 if (layout.isLeaf) {
                     auto color = getComponentColor(layout.colorIndex);
-                    renderConstraintGraph(
-                        cr, graph, effectiveZoom, color.r, color.g, color.b);
+                    renderConstraintGraphAsGraph(cr, graph, effectiveZoom,
+                        color.r, color.g, color.b, &m_originalIds);
                 } else {
-                    renderConstraintGraph(
-                        cr, graph, effectiveZoom, 0.3, 0.3, 0.3);
+                    renderConstraintGraphAsGraph(cr, graph, effectiveZoom, 0.3,
+                        0.3, 0.3, &m_originalIds);
                 }
 
                 cr->restore();

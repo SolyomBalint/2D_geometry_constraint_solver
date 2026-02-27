@@ -3,6 +3,8 @@
 // General STD/STL headers
 #include <format>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace Gui {
 
@@ -27,6 +29,8 @@ ModellerView::ModellerView(ConstraintModel& model)
         sigc::mem_fun(*this, &ModellerView::onConstraintRequested));
     m_canvas.signalAngleConstraintRequested().connect(
         sigc::mem_fun(*this, &ModellerView::onAngleConstraintRequested));
+    m_canvas.signalAngleConstraintConfirmed().connect(
+        sigc::mem_fun(*this, &ModellerView::onAngleConstraintConfirmed));
 
     // Default tool
     onToolChanged(Tool::Select);
@@ -263,17 +267,9 @@ void ModellerView::onAngleConstraintRequested(ElementId elemA, ElementId elemB)
         try {
             double angleDegrees = std::stod(std::string(text));
             if (angleDegrees > 0.0 && angleDegrees < 360.0) {
-                auto constraintId
-                    = m_model.addAngleConstraint(elemA, elemB, angleDegrees);
-                if (constraintId.has_value()) {
-                    CanvasConstraint canvasConstraint {};
-                    canvasConstraint.id = *constraintId;
-                    canvasConstraint.elementA = elemA;
-                    canvasConstraint.elementB = elemB;
-                    canvasConstraint.value = angleDegrees;
-                    canvasConstraint.type = CanvasConstraintType::Angle;
-                    m_canvas.addCanvasConstraint(canvasConstraint);
-                }
+                // Enter placement mode: preview the arc and let the
+                // user click on which side to place it.
+                m_canvas.startAnglePlacement(elemA, elemB, angleDegrees);
             }
         } catch (...) {
             // Invalid number, ignore
@@ -287,9 +283,119 @@ void ModellerView::onAngleConstraintRequested(ElementId elemA, ElementId elemB)
     dialog->present();
 }
 
+void ModellerView::onAngleConstraintConfirmed(
+    ElementId elemA, ElementId elemB, double angleDegrees, bool flipped)
+{
+    auto constraintId
+        = m_model.addAngleConstraint(elemA, elemB, angleDegrees, flipped);
+    if (constraintId.has_value()) {
+        CanvasConstraint canvasConstraint {};
+        canvasConstraint.id = *constraintId;
+        canvasConstraint.elementA = elemA;
+        canvasConstraint.elementB = elemB;
+        canvasConstraint.value = angleDegrees;
+        canvasConstraint.type = CanvasConstraintType::Angle;
+        canvasConstraint.flipped = flipped;
+        m_canvas.addCanvasConstraint(canvasConstraint);
+    }
+}
+
 void ModellerView::onStatusChanged(const Glib::ustring& status)
 {
     m_statusLabel.set_text(status);
+}
+
+const Canvas& ModellerView::getCanvas() const
+{
+    return m_canvas;
+}
+
+Canvas& ModellerView::getCanvas()
+{
+    return m_canvas;
+}
+
+std::string ModellerView::loadModelData(const ModelData& data)
+{
+    m_canvas.clearAll();
+
+    // Maps element array index -> newly assigned ElementId.
+    std::vector<ElementId> indexToId;
+    indexToId.reserve(data.elements.size());
+
+    for (const auto& elem : data.elements) {
+        ElementId newId = 0;
+        if (elem.type == CanvasElementType::Point) {
+            newId = m_model.addPoint(elem.x, elem.y);
+        } else {
+            newId = m_model.addLine(elem.x, elem.y, elem.x2, elem.y2);
+        }
+
+        CanvasElement canvasElem {};
+        canvasElem.id = newId;
+        canvasElem.type = elem.type;
+        canvasElem.x = elem.x;
+        canvasElem.y = elem.y;
+        canvasElem.x2 = elem.x2;
+        canvasElem.y2 = elem.y2;
+        m_canvas.addCanvasElement(canvasElem);
+
+        indexToId.push_back(newId);
+    }
+
+    for (const auto& constr : data.constraints) {
+        if (constr.elementA >= indexToId.size()
+            || constr.elementB >= indexToId.size()) {
+            return std::format("Constraint references invalid element index "
+                               "({} or {}; {} elements loaded)",
+                constr.elementA, constr.elementB, indexToId.size());
+        }
+
+        ElementId elemA = indexToId[constr.elementA];
+        ElementId elemB = indexToId[constr.elementB];
+
+        if (constr.type == CanvasConstraintType::Distance) {
+            auto cid
+                = m_model.addDistanceConstraint(elemA, elemB, constr.value);
+            if (!cid.has_value()) {
+                return std::format("Failed to add distance constraint between "
+                                   "elements {} and {}",
+                    constr.elementA, constr.elementB);
+            }
+
+            CanvasConstraint cc {};
+            cc.id = *cid;
+            cc.elementA = elemA;
+            cc.elementB = elemB;
+            cc.value = constr.value;
+            cc.type = CanvasConstraintType::Distance;
+            m_canvas.addCanvasConstraint(cc);
+
+        } else {
+            auto cid = m_model.addAngleConstraint(
+                elemA, elemB, constr.value, constr.flipped);
+            if (!cid.has_value()) {
+                return std::format("Failed to add angle constraint between "
+                                   "elements {} and {}",
+                    constr.elementA, constr.elementB);
+            }
+
+            CanvasConstraint cc {};
+            cc.id = *cid;
+            cc.elementA = elemA;
+            cc.elementB = elemB;
+            cc.value = constr.value;
+            cc.type = CanvasConstraintType::Angle;
+            cc.flipped = constr.flipped;
+            m_canvas.addCanvasConstraint(cc);
+        }
+    }
+
+    // Restore viewport.
+    m_canvas.setPanZoom(data.panX, data.panY, data.zoom);
+
+    m_statusLabel.set_text("Model loaded successfully");
+    return "";
 }
 
 } // namespace Gui

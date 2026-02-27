@@ -108,8 +108,9 @@ public:
 
     int getDeficit()
     {
-        return (2 * m_constraintGraph.nodeCount() - 3)
-            - m_constraintGraph.edgeCount();
+        auto nodeCount = static_cast<int>(m_constraintGraph.nodeCount());
+        auto edgeCount = static_cast<int>(m_constraintGraph.edgeCount());
+        return (2 * nodeCount - 3) - edgeCount;
     }
 
     Graph& getGraph() { return m_constraintGraph; }

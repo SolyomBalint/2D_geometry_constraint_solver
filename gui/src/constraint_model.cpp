@@ -24,6 +24,18 @@ namespace Gui {
 
 ConstraintModel::ConstraintModel() = default;
 
+void ConstraintModel::clear()
+{
+    m_constraintGraph = Gcs::ConstraintGraph();
+    m_elemToNode.clear();
+    m_nodeToElem.clear();
+    m_constrToEdge.clear();
+    m_edgeToConstr.clear();
+    m_nextElementId = 0;
+    m_nextConstraintId = 0;
+    notifyChange();
+}
+
 ElementId ConstraintModel::addPoint(double x, double y)
 {
     auto nodeId = m_constraintGraph.getGraph().addNode();
@@ -94,7 +106,7 @@ std::optional<ConstraintId> ConstraintModel::addDistanceConstraint(
 }
 
 std::optional<ConstraintId> ConstraintModel::addAngleConstraint(
-    ElementId elemA, ElementId elemB, double angleDegrees)
+    ElementId elemA, ElementId elemB, double angleDegrees, bool flipOrientation)
 {
     auto itA = m_elemToNode.find(elemA);
     auto itB = m_elemToNode.find(elemB);
@@ -118,8 +130,8 @@ std::optional<ConstraintId> ConstraintModel::addAngleConstraint(
 
     auto edgeId = edgeResult.value();
     double angleRadians = angleDegrees * std::numbers::pi / 180.0;
-    auto constraint
-        = std::make_shared<Gcs::Constraint>(Gcs::AngleConstraint(angleRadians));
+    auto constraint = std::make_shared<Gcs::Constraint>(
+        Gcs::AngleConstraint(angleRadians, flipOrientation));
 
     m_constraintGraph.addConstraint(edgeId, constraint);
 

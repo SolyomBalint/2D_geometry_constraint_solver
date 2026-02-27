@@ -83,10 +83,66 @@ public:
     AngleConstraintRequestSignal signalAngleConstraintRequested();
 
     /**
+     * @brief Add an element record to the canvas's visual state.
+     * @param element The canvas element to add.
+     */
+    void addCanvasElement(const CanvasElement& element);
+
+    /**
      * @brief Add a constraint record to the canvas's visual state.
      * @param constraint The canvas constraint to add.
      */
     void addCanvasConstraint(const CanvasConstraint& constraint);
+
+    /**
+     * @brief Remove all elements, constraints, and reset interaction
+     *        state.
+     *
+     * Clears the visual element and constraint maps, resets selection,
+     * pending operations, and triggers a redraw.
+     */
+    void clearAll();
+
+    /** @brief Get the current horizontal pan offset. */
+    [[nodiscard]] double getPanX() const;
+
+    /** @brief Get the current vertical pan offset. */
+    [[nodiscard]] double getPanY() const;
+
+    /** @brief Get the current zoom level. */
+    [[nodiscard]] double getZoom() const;
+
+    /**
+     * @brief Set the pan and zoom state.
+     * @param panX Horizontal pan offset.
+     * @param panY Vertical pan offset.
+     * @param zoom Zoom level.
+     */
+    void setPanZoom(double panX, double panY, double zoom);
+
+    /**
+     * @brief Enter angle placement mode.
+     *
+     * After the user enters an angle value in the dialog, this
+     * method puts the canvas into a mode where a preview arc
+     * follows the mouse. The user clicks to confirm on which
+     * side of the two lines the angle should be placed.
+     *
+     * @param elemA First line element ID.
+     * @param elemB Second line element ID.
+     * @param angleDegrees The angle value in degrees.
+     */
+    void startAnglePlacement(
+        ElementId elemA, ElementId elemB, double angleDegrees);
+
+    /**
+     * @brief Signal emitted when the user confirms angle placement.
+     *
+     * Parameters: elemA, elemB, angleDegrees, flipped.
+     */
+    using AngleConstraintConfirmedSignal
+        = sigc::signal<void(ElementId, ElementId, double, bool)>;
+    AngleConstraintConfirmedSignal signalAngleConstraintConfirmed();
 
 private:
     // Drawing
@@ -100,8 +156,10 @@ private:
         const CanvasElement& elementB, double fontSize);
     void drawAngleConstraint(const Cairo::RefPtr<Cairo::Context>& cr,
         const CanvasConstraint& constraint, const CanvasElement& lineA,
-        const CanvasElement& lineB, double fontSize);
+        const CanvasElement& lineB, double fontSize,
+        bool useValueMatching = true);
     void drawPendingLine(const Cairo::RefPtr<Cairo::Context>& cr);
+    void drawAnglePlacementPreview(const Cairo::RefPtr<Cairo::Context>& cr);
 
     // Hit testing
     std::optional<ElementId> hitTest(double x, double y) const;
@@ -167,10 +225,20 @@ private:
     double m_mouseWorldX = 0.0;
     double m_mouseWorldY = 0.0;
 
+    // Angle placement mode state
+    struct PendingAnglePlacement {
+        ElementId elementA;
+        ElementId elementB;
+        double angleDegrees;
+        bool flipped = false;
+    };
+    std::optional<PendingAnglePlacement> m_pendingAnglePlacement;
+
     // Signals
     StatusSignal m_statusSignal;
     ConstraintRequestSignal m_constraintRequestSignal;
     AngleConstraintRequestSignal m_angleConstraintRequestSignal;
+    AngleConstraintConfirmedSignal m_angleConstraintConfirmedSignal;
 
     // Gesture controllers (prevent premature destruction)
     Glib::RefPtr<Gtk::GestureClick> m_clickGesture;

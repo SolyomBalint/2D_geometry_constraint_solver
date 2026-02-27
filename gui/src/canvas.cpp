@@ -154,9 +154,52 @@ Canvas::AngleConstraintRequestSignal Canvas::signalAngleConstraintRequested()
     return m_angleConstraintRequestSignal;
 }
 
+void Canvas::addCanvasElement(const CanvasElement& element)
+{
+    m_elements[element.id] = element;
+    queue_draw();
+}
+
 void Canvas::addCanvasConstraint(const CanvasConstraint& constraint)
 {
     m_constraints[constraint.id] = constraint;
+    queue_draw();
+}
+
+void Canvas::clearAll()
+{
+    m_elements.clear();
+    m_constraints.clear();
+    m_selectedElement.reset();
+    m_constraintFirstElement.reset();
+    m_angleConstraintFirstElement.reset();
+    m_lineFirstPointSet = false;
+    m_isDragging = false;
+    m_isPanning = false;
+    m_pendingAnglePlacement.reset();
+    queue_draw();
+}
+
+double Canvas::getPanX() const
+{
+    return m_panX;
+}
+
+double Canvas::getPanY() const
+{
+    return m_panY;
+}
+
+double Canvas::getZoom() const
+{
+    return m_zoom;
+}
+
+void Canvas::setPanZoom(double panX, double panY, double zoom)
+{
+    m_panX = panX;
+    m_panY = panY;
+    m_zoom = zoom;
     queue_draw();
 }
 
@@ -180,6 +223,7 @@ void Canvas::onDraw(
     drawConstraints(cr);
     drawElements(cr);
     drawPendingLine(cr);
+    drawAnglePlacementPreview(cr);
 
     cr->restore();
 }
@@ -294,7 +338,12 @@ void Canvas::drawConstraints(const Cairo::RefPtr<Cairo::Context>& cr)
         const auto& elementB = iteratorB->second;
 
         if (constraint.type == CanvasConstraintType::Angle) {
-            drawAngleConstraint(cr, constraint, elementA, elementB, fontSize);
+            // Use value-matching only after both elements have been
+            // solved; before solving, respect the user's placement.
+            bool solved = m_model.isElementSolved(constraint.elementA)
+                && m_model.isElementSolved(constraint.elementB);
+            drawAngleConstraint(
+                cr, constraint, elementA, elementB, fontSize, solved);
         } else {
             drawDistanceConstraint(
                 cr, constraint, elementA, elementB, fontSize);
@@ -308,17 +357,47 @@ void Canvas::drawDistanceConstraint(const Cairo::RefPtr<Cairo::Context>& cr,
 {
     double lineWidth = 1.5 / m_zoom;
 
-    // Compute center points for each element
+    // Project a point onto the infinite line through (x1,y1)-(x2,y2)
+    // and return the perpendicular foot.
+    auto projectOntoLine
+        = [](double px, double py, double x1, double y1, double x2, double y2,
+              double& footX, double& footY) {
+              double dx = x2 - x1;
+              double dy = y2 - y1;
+              double lengthSq = dx * dx + dy * dy;
+              if (lengthSq < 1e-12) {
+                  footX = x1;
+                  footY = y1;
+                  return;
+              }
+              double t = ((px - x1) * dx + (py - y1) * dy) / lengthSq;
+              footX = x1 + t * dx;
+              footY = y1 + t * dy;
+          };
+
+    // Compute endpoint for each element.  For a line paired with a
+    // point the endpoint is the perpendicular foot of the point on
+    // the line (not the line midpoint), because the distance
+    // constraint represents perpendicular distance.
     double centerAX = elementA.x;
     double centerAY = elementA.y;
     double centerBX = elementB.x;
     double centerBY = elementB.y;
 
-    if (elementA.type == CanvasElementType::Line) {
+    if (elementA.type == CanvasElementType::Line
+        && elementB.type == CanvasElementType::Point) {
+        projectOntoLine(elementB.x, elementB.y, elementA.x, elementA.y,
+            elementA.x2, elementA.y2, centerAX, centerAY);
+    } else if (elementA.type == CanvasElementType::Line) {
         centerAX = (elementA.x + elementA.x2) / 2.0;
         centerAY = (elementA.y + elementA.y2) / 2.0;
     }
-    if (elementB.type == CanvasElementType::Line) {
+
+    if (elementB.type == CanvasElementType::Line
+        && elementA.type == CanvasElementType::Point) {
+        projectOntoLine(elementA.x, elementA.y, elementB.x, elementB.y,
+            elementB.x2, elementB.y2, centerBX, centerBY);
+    } else if (elementB.type == CanvasElementType::Line) {
         centerBX = (elementB.x + elementB.x2) / 2.0;
         centerBY = (elementB.y + elementB.y2) / 2.0;
     }
@@ -351,7 +430,7 @@ void Canvas::drawDistanceConstraint(const Cairo::RefPtr<Cairo::Context>& cr,
 
 void Canvas::drawAngleConstraint(const Cairo::RefPtr<Cairo::Context>& cr,
     const CanvasConstraint& constraint, const CanvasElement& lineA,
-    const CanvasElement& lineB, double fontSize)
+    const CanvasElement& lineB, double fontSize, bool useValueMatching)
 {
     // Compute the intersection point of the two lines.
     // Line A: from (lineA.x, lineA.y) to (lineA.x2, lineA.y2)
@@ -386,16 +465,40 @@ void Canvas::drawAngleConstraint(const Cairo::RefPtr<Cairo::Context>& cr,
         intersectionY = lineA.y + parameterT * directionAY;
     }
 
+    // During placement preview, use the flipped flag directly
+    // (the user is choosing which side via mouse position).
+    // For committed constraints, use value-matching: compare the
+    // arc angle to the constraint value and flip to the side
+    // that matches, since post-solve directions may have changed.
+    if (useValueMatching) {
+        // Compute default arc and check against constraint value.
+        double tempAngleA = std::atan2(directionAY, directionAX);
+        double tempDiff = std::atan2(directionBY, directionBX) - tempAngleA;
+        while (tempDiff > std::numbers::pi) {
+            tempDiff -= 2.0 * std::numbers::pi;
+        }
+        while (tempDiff < -std::numbers::pi) {
+            tempDiff += 2.0 * std::numbers::pi;
+        }
+        double constraintRadians = constraint.value * std::numbers::pi / 180.0;
+        double defaultArcAngle = std::abs(tempDiff);
+        double supplementaryArcAngle = std::numbers::pi - defaultArcAngle;
+        if (std::abs(supplementaryArcAngle - constraintRadians)
+            < std::abs(defaultArcAngle - constraintRadians)) {
+            directionAX = -directionAX;
+            directionAY = -directionAY;
+        }
+    } else if (constraint.flipped) {
+        directionAX = -directionAX;
+        directionAY = -directionAY;
+    }
+
     // Compute the angle of each line direction relative to X axis.
     double angleA = std::atan2(directionAY, directionAX);
     double angleB = std::atan2(directionBY, directionBX);
 
-    // Normalize angles so the arc sweeps the smaller angle between
-    // the two line directions. We want to draw the arc from angleA
-    // to angleB through the smaller angular sweep.
+    // Normalize the sweep to [-pi, pi] (the smaller angle).
     double angleDifference = angleB - angleA;
-
-    // Normalize to [-pi, pi]
     while (angleDifference > std::numbers::pi) {
         angleDifference -= 2.0 * std::numbers::pi;
     }
@@ -411,6 +514,10 @@ void Canvas::drawAngleConstraint(const Cairo::RefPtr<Cairo::Context>& cr,
     cr->set_source_rgba(0.1, 0.5, 0.8, 0.8);
     cr->set_line_width(1.5 / m_zoom);
 
+    // begin_new_sub_path() clears any leftover current point so that
+    // Cairo does not draw a spurious straight line from a previous
+    // drawing operation (e.g. show_text) to the arc start.
+    cr->begin_new_sub_path();
     if (angleDifference >= 0.0) {
         cr->arc(intersectionX, intersectionY, arcRadius, arcStartAngle,
             arcEndAngle);
@@ -421,7 +528,9 @@ void Canvas::drawAngleConstraint(const Cairo::RefPtr<Cairo::Context>& cr,
     cr->stroke();
 
     // Draw small lines from the intersection outward along each
-    // line direction to visually anchor the arc.
+    // line direction to visually anchor the arc. Orient each tick
+    // toward the line segment (not blindly in the p2-p1 direction)
+    // so it overlays on the visible geometry.
     double tickLength = arcRadius * 1.3;
     cr->set_source_rgba(0.1, 0.5, 0.8, 0.5);
     cr->set_line_width(1.0 / m_zoom);
@@ -430,19 +539,33 @@ void Canvas::drawAngleConstraint(const Cairo::RefPtr<Cairo::Context>& cr,
     double lengthB = std::hypot(directionBX, directionBY);
 
     if (lengthA > 1e-9) {
-        double unitAX = directionAX / lengthA;
-        double unitAY = directionAY / lengthA;
+        double tickAX = directionAX / lengthA;
+        double tickAY = directionAY / lengthA;
+        double midAX = (lineA.x + lineA.x2) / 2.0;
+        double midAY = (lineA.y + lineA.y2) / 2.0;
+        if ((midAX - intersectionX) * tickAX + (midAY - intersectionY) * tickAY
+            < 0.0) {
+            tickAX = -tickAX;
+            tickAY = -tickAY;
+        }
         cr->move_to(intersectionX, intersectionY);
-        cr->line_to(intersectionX + unitAX * tickLength,
-            intersectionY + unitAY * tickLength);
+        cr->line_to(intersectionX + tickAX * tickLength,
+            intersectionY + tickAY * tickLength);
         cr->stroke();
     }
     if (lengthB > 1e-9) {
-        double unitBX = directionBX / lengthB;
-        double unitBY = directionBY / lengthB;
+        double tickBX = directionBX / lengthB;
+        double tickBY = directionBY / lengthB;
+        double midBX = (lineB.x + lineB.x2) / 2.0;
+        double midBY = (lineB.y + lineB.y2) / 2.0;
+        if ((midBX - intersectionX) * tickBX + (midBY - intersectionY) * tickBY
+            < 0.0) {
+            tickBX = -tickBX;
+            tickBY = -tickBY;
+        }
         cr->move_to(intersectionX, intersectionY);
-        cr->line_to(intersectionX + unitBX * tickLength,
-            intersectionY + unitBY * tickLength);
+        cr->line_to(intersectionX + tickBX * tickLength,
+            intersectionY + tickBY * tickLength);
         cr->stroke();
     }
 
@@ -476,6 +599,52 @@ void Canvas::drawPendingLine(const Cairo::RefPtr<Cairo::Context>& cr)
         cr->stroke();
         cr->unset_dash();
     }
+}
+
+void Canvas::drawAnglePlacementPreview(const Cairo::RefPtr<Cairo::Context>& cr)
+{
+    if (!m_pendingAnglePlacement.has_value()) {
+        return;
+    }
+
+    const auto& pending = *m_pendingAnglePlacement;
+    auto iterA = m_elements.find(pending.elementA);
+    auto iterB = m_elements.find(pending.elementB);
+    if (iterA == m_elements.end() || iterB == m_elements.end()) {
+        return;
+    }
+
+    // Build a temporary CanvasConstraint to reuse drawAngleConstraint.
+    CanvasConstraint preview {};
+    preview.elementA = pending.elementA;
+    preview.elementB = pending.elementB;
+    preview.value = pending.angleDegrees;
+    preview.type = CanvasConstraintType::Angle;
+    preview.flipped = pending.flipped;
+
+    double fontSize = 11.0 / m_zoom;
+    // Use flipped flag directly (not value-matching) for placement.
+    drawAngleConstraint(
+        cr, preview, iterA->second, iterB->second, fontSize, false);
+}
+
+void Canvas::startAnglePlacement(
+    ElementId elemA, ElementId elemB, double angleDegrees)
+{
+    m_pendingAnglePlacement = PendingAnglePlacement {
+        .elementA = elemA,
+        .elementB = elemB,
+        .angleDegrees = angleDegrees,
+        .flipped = false,
+    };
+    clearSelection();
+    updateStatus();
+    queue_draw();
+}
+
+Canvas::AngleConstraintConfirmedSignal Canvas::signalAngleConstraintConfirmed()
+{
+    return m_angleConstraintConfirmedSignal;
 }
 
 // ============================================================
@@ -571,7 +740,34 @@ std::optional<ConstraintId> Canvas::hitTestConstraint(
                 intersectionY = elementA.y + parameterT * directionAY;
             }
 
-            // Arc midpoint angle
+            // Match the flip logic from drawAngleConstraint:
+            // value-matching only when both elements are solved.
+            bool solved = m_model.isElementSolved(constraint.elementA)
+                && m_model.isElementSolved(constraint.elementB);
+            if (solved) {
+                double tempAngleA = std::atan2(directionAY, directionAX);
+                double tempDiff
+                    = std::atan2(directionBY, directionBX) - tempAngleA;
+                while (tempDiff > std::numbers::pi) {
+                    tempDiff -= 2.0 * std::numbers::pi;
+                }
+                while (tempDiff < -std::numbers::pi) {
+                    tempDiff += 2.0 * std::numbers::pi;
+                }
+                double constraintRad
+                    = constraint.value * std::numbers::pi / 180.0;
+                double defArc = std::abs(tempDiff);
+                double supArc = std::numbers::pi - defArc;
+                if (std::abs(supArc - constraintRad)
+                    < std::abs(defArc - constraintRad)) {
+                    directionAX = -directionAX;
+                    directionAY = -directionAY;
+                }
+            } else if (constraint.flipped) {
+                directionAX = -directionAX;
+                directionAY = -directionAY;
+            }
+
             double angleA = std::atan2(directionAY, directionAX);
             double angleB = std::atan2(directionBY, directionBX);
             double angleDifference = angleB - angleA;
@@ -589,17 +785,42 @@ std::optional<ConstraintId> Canvas::hitTestConstraint(
             hitPointY = intersectionY + labelRadius * std::sin(labelAngle);
         } else {
             // For distance constraints, hit-test at the midpoint of
-            // the dashed line between element centers.
+            // the perpendicular dashed line between elements.
+            auto projectOntoLine
+                = [](double px, double py, double x1, double y1, double x2,
+                      double y2, double& footX, double& footY) {
+                      double dx = x2 - x1;
+                      double dy = y2 - y1;
+                      double lengthSq = dx * dx + dy * dy;
+                      if (lengthSq < 1e-12) {
+                          footX = x1;
+                          footY = y1;
+                          return;
+                      }
+                      double t = ((px - x1) * dx + (py - y1) * dy) / lengthSq;
+                      footX = x1 + t * dx;
+                      footY = y1 + t * dy;
+                  };
+
             double centerAX = elementA.x;
             double centerAY = elementA.y;
             double centerBX = elementB.x;
             double centerBY = elementB.y;
 
-            if (elementA.type == CanvasElementType::Line) {
+            if (elementA.type == CanvasElementType::Line
+                && elementB.type == CanvasElementType::Point) {
+                projectOntoLine(elementB.x, elementB.y, elementA.x, elementA.y,
+                    elementA.x2, elementA.y2, centerAX, centerAY);
+            } else if (elementA.type == CanvasElementType::Line) {
                 centerAX = (elementA.x + elementA.x2) / 2.0;
                 centerAY = (elementA.y + elementA.y2) / 2.0;
             }
-            if (elementB.type == CanvasElementType::Line) {
+
+            if (elementB.type == CanvasElementType::Line
+                && elementA.type == CanvasElementType::Point) {
+                projectOntoLine(elementA.x, elementA.y, elementB.x, elementB.y,
+                    elementB.x2, elementB.y2, centerBX, centerBY);
+            } else if (elementB.type == CanvasElementType::Line) {
                 centerBX = (elementB.x + elementB.x2) / 2.0;
                 centerBY = (elementB.y + elementB.y2) / 2.0;
             }
@@ -645,6 +866,17 @@ void Canvas::onClickPressed([[maybe_unused]] int nPress, double x, double y)
     double wx = 0.0;
     double wy = 0.0;
     screenToWorld(x, y, wx, wy);
+
+    // If in angle placement mode, confirm the placement.
+    if (m_pendingAnglePlacement.has_value()) {
+        const auto& pending = *m_pendingAnglePlacement;
+        m_angleConstraintConfirmedSignal.emit(pending.elementA,
+            pending.elementB, pending.angleDegrees, pending.flipped);
+        m_pendingAnglePlacement.reset();
+        updateStatus();
+        queue_draw();
+        return;
+    }
 
     switch (m_currentTool) {
     case Tool::Select:
@@ -747,6 +979,82 @@ void Canvas::onMotion(double x, double y)
         queue_draw();
     }
 
+    // During angle placement, determine which side the mouse is
+    // on and update the flipped state accordingly.
+    if (m_pendingAnglePlacement.has_value()) {
+        auto& pending = *m_pendingAnglePlacement;
+        auto iterA = m_elements.find(pending.elementA);
+        auto iterB = m_elements.find(pending.elementB);
+        if (iterA != m_elements.end() && iterB != m_elements.end()) {
+            const auto& lineA = iterA->second;
+            const auto& lineB = iterB->second;
+
+            // Compute intersection of the two lines.
+            double dirAX = lineA.x2 - lineA.x;
+            double dirAY = lineA.y2 - lineA.y;
+            double dirBX = lineB.x2 - lineB.x;
+            double dirBY = lineB.y2 - lineB.y;
+            double cross = dirAX * dirBY - dirAY * dirBX;
+
+            double ix = 0.0;
+            double iy = 0.0;
+            if (std::abs(cross) < 1e-9) {
+                ix = (lineA.x + lineA.x2 + lineB.x + lineB.x2) / 4.0;
+                iy = (lineA.y + lineA.y2 + lineB.y + lineB.y2) / 4.0;
+            } else {
+                double dox = lineB.x - lineA.x;
+                double doy = lineB.y - lineA.y;
+                double t = (dox * dirBY - doy * dirBX) / cross;
+                ix = lineA.x + t * dirAX;
+                iy = lineA.y + t * dirAY;
+            }
+
+            // Compute angle from intersection to mouse position.
+            double mouseAngle
+                = std::atan2(m_mouseWorldY - iy, m_mouseWorldX - ix);
+
+            // Compute the two possible arc midpoint angles (default
+            // and flipped) and pick whichever is closer to the mouse.
+            double angleA = std::atan2(dirAY, dirAX);
+            double angleB = std::atan2(dirBY, dirBX);
+            double diff = angleB - angleA;
+            while (diff > std::numbers::pi) {
+                diff -= 2.0 * std::numbers::pi;
+            }
+            while (diff < -std::numbers::pi) {
+                diff += 2.0 * std::numbers::pi;
+            }
+            double defaultMid = angleA + diff / 2.0;
+
+            // Flipped: negate dirA → angleA shifts by pi.
+            double flippedAngleA = angleA + std::numbers::pi;
+            double flippedDiff = angleB - flippedAngleA;
+            while (flippedDiff > std::numbers::pi) {
+                flippedDiff -= 2.0 * std::numbers::pi;
+            }
+            while (flippedDiff < -std::numbers::pi) {
+                flippedDiff += 2.0 * std::numbers::pi;
+            }
+            double flippedMid = flippedAngleA + flippedDiff / 2.0;
+
+            // Angular distance from mouse to each midpoint.
+            auto angleDist = [](double a, double b) {
+                double d = a - b;
+                while (d > std::numbers::pi) {
+                    d -= 2.0 * std::numbers::pi;
+                }
+                while (d < -std::numbers::pi) {
+                    d += 2.0 * std::numbers::pi;
+                }
+                return std::abs(d);
+            };
+
+            pending.flipped = angleDist(mouseAngle, flippedMid)
+                < angleDist(mouseAngle, defaultMid);
+        }
+        queue_draw();
+    }
+
     updateStatus();
 }
 
@@ -795,7 +1103,9 @@ bool Canvas::onKeyPressed(guint keyval, [[maybe_unused]] guint keycode,
         m_lineFirstPointSet = false;
         m_constraintFirstElement.reset();
         m_angleConstraintFirstElement.reset();
+        m_pendingAnglePlacement.reset();
         updateStatus();
+        queue_draw();
         return true;
     }
 
@@ -972,7 +1282,9 @@ void Canvas::updateStatus()
         break;
     case Tool::AngleConstraint:
         toolName = "Angle Constraint";
-        if (m_angleConstraintFirstElement.has_value())
+        if (m_pendingAnglePlacement.has_value())
+            toolName += " (click to place angle arc)";
+        else if (m_angleConstraintFirstElement.has_value())
             toolName += " (click second line)";
         else
             toolName += " (click first line)";

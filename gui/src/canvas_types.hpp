@@ -49,6 +49,9 @@ struct CanvasConstraint {
     ElementId elementB;
     double value;
     CanvasConstraintType type = CanvasConstraintType::Distance;
+    /// For angle constraints: when true, the arc is drawn on the
+    /// opposite (supplementary) side of the two lines.
+    bool flipped = false;
 };
 
 } // namespace Gui

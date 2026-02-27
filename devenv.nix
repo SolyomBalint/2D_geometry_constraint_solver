@@ -36,6 +36,8 @@ in
     ## GUI dependencies
     gtk4
     gtkmm4
+    gsettings-desktop-schemas
+    wrapGAppsHook4
     pkg-config
   ];
 
@@ -55,6 +57,10 @@ in
   enterShell = ''
     export CC=clang
     export CXX=clang++
+
+    # Make GTK4 GSettings schemas (e.g. FileChooser) discoverable
+    # for development builds that are not wrapped by wrapGAppsHook.
+    export XDG_DATA_DIRS="${pkgs_unstable.gtk4}/share/gsettings-schemas/${pkgs_unstable.gtk4.name}:$XDG_DATA_DIRS"
 
     echo ""
     echo "██████╗ ███╗   ███╗███████╗    ██╗██╗████████╗"
