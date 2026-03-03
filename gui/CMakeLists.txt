@@ -29,7 +29,9 @@ target_link_libraries(gcs_gui PRIVATE
     Eigen3::Eigen
     nlohmann_json::nlohmann_json)
 
-target_compile_definitions(gcs_gui PRIVATE SPDLOG_USE_STD_FORMAT)
+target_compile_definitions(gcs_gui PRIVATE
+    SPDLOG_USE_STD_FORMAT
+    GCS_MODELS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/models")
 
 target_compile_options(gcs_gui PRIVATE
     $<$<CONFIG:Debug>:-ggdb>

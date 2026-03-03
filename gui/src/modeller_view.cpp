@@ -1,26 +1,53 @@
 #include "modeller_view.hpp"
 
 // General STD/STL headers
+#include <filesystem>
 #include <format>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+// Thirdparty headers
+#include <spdlog/spdlog.h>
+
 namespace Gui {
+
+namespace {
+
+    const auto MODELLER_VIEW_LOGGER = spdlog::stdout_color_mt("MODELLER_VIEW");
+
+} // namespace
 
 ModellerView::ModellerView(ConstraintModel& model)
     : Gtk::Box(Gtk::Orientation::VERTICAL)
     , m_model(model)
     , m_canvas(model)
     , m_toolbar(Gtk::Orientation::HORIZONTAL)
+    , m_mainPane(Gtk::Orientation::HORIZONTAL)
+    , m_sidebarBox(Gtk::Orientation::VERTICAL)
+    , m_canvasArea(Gtk::Orientation::VERTICAL)
 {
     buildToolbar();
     buildStatusBar();
+    buildSidebar();
 
-    // Layout: toolbar on top, canvas in the middle, status bar at bottom
+    // Canvas area: canvas + status label
+    m_canvas.set_hexpand(true);
+    m_canvas.set_vexpand(true);
+    m_canvasArea.append(m_canvas);
+    m_canvasArea.append(m_statusLabel);
+
+    // Paned: sidebar on left, canvas area on right
+    m_mainPane.set_start_child(m_sidebarBox);
+    m_mainPane.set_end_child(m_canvasArea);
+    m_mainPane.set_resize_start_child(false);
+    m_mainPane.set_shrink_start_child(false);
+    m_mainPane.set_vexpand(true);
+
     append(m_toolbar);
-    append(m_canvas);
-    append(m_statusLabel);
+    append(m_mainPane);
 
     // Connect canvas signals
     m_canvas.signalStatusChanged().connect(
@@ -133,6 +160,109 @@ void ModellerView::buildStatusBar()
     m_statusLabel.set_margin(4);
     m_statusLabel.set_text("Ready");
     m_statusLabel.add_css_class("dim-label");
+}
+
+void ModellerView::buildSidebar()
+{
+    // Title
+    m_sidebarTitle.set_text("Saved Models");
+    m_sidebarTitle.add_css_class("heading");
+    m_sidebarTitle.set_margin_top(8);
+    m_sidebarTitle.set_margin_bottom(4);
+    m_sidebarTitle.set_margin_start(8);
+    m_sidebarTitle.set_halign(Gtk::Align::START);
+
+    // ListBox
+    m_modelList.set_selection_mode(Gtk::SelectionMode::SINGLE);
+    m_modelList.signal_row_activated().connect([this](Gtk::ListBoxRow* row) {
+        if (!row)
+            return;
+        auto* label = dynamic_cast<Gtk::Label*>(row->get_child());
+        if (!label)
+            return;
+        std::string filename = std::string(label->get_text());
+        loadFromFile(std::string(GCS_MODELS_DIR) + "/" + filename);
+    });
+
+    m_sidebarScroll.set_child(m_modelList);
+    m_sidebarScroll.set_vexpand(true);
+    m_sidebarScroll.set_hexpand(false);
+    m_sidebarScroll.set_policy(
+        Gtk::PolicyType::NEVER, Gtk::PolicyType::AUTOMATIC);
+
+    m_sidebarBox.set_orientation(Gtk::Orientation::VERTICAL);
+    m_sidebarBox.append(m_sidebarTitle);
+    m_sidebarBox.append(m_sidebarScroll);
+    m_sidebarBox.set_size_request(160, -1);
+
+    refreshModelList();
+}
+
+void ModellerView::refreshModelList()
+{
+    // Remove existing rows
+    while (auto* row = m_modelList.get_row_at_index(0))
+        m_modelList.remove(*row);
+
+    namespace fs = std::filesystem;
+    const fs::path modelsDir { GCS_MODELS_DIR };
+    if (!fs::exists(modelsDir) || !fs::is_directory(modelsDir))
+        return;
+
+    std::vector<std::string> names;
+    for (const auto& entry : fs::directory_iterator(modelsDir)) {
+        if (entry.path().extension() == ".gcs")
+            names.push_back(entry.path().filename().string());
+    }
+    std::ranges::sort(names);
+
+    for (const auto& name : names) {
+        auto* label = Gtk::make_managed<Gtk::Label>(name);
+        label->set_halign(Gtk::Align::START);
+        label->set_margin(6);
+        label->set_tooltip_text(name);
+        label->set_max_width_chars(18);
+        label->set_ellipsize(Pango::EllipsizeMode::END);
+        m_modelList.append(*label);
+    }
+}
+
+void ModellerView::loadFromFile(const std::string& path)
+{
+    std::ifstream in(path);
+    if (!in.is_open()) {
+        MODELLER_VIEW_LOGGER->error("Failed to open file: {}", path);
+        m_statusLabel.set_text("Error: could not open file");
+        return;
+    }
+
+    std::ostringstream buffer;
+    buffer << in.rdbuf();
+
+    if (in.fail() && !in.eof()) {
+        MODELLER_VIEW_LOGGER->error("Failed to read file: {}", path);
+        m_statusLabel.set_text("Error: could not read file");
+        return;
+    }
+
+    auto modelData = ModelSerializer::deserialize(buffer.str());
+    if (!modelData.has_value()) {
+        MODELLER_VIEW_LOGGER->error(
+            "Failed to deserialize: {}", modelData.error());
+        m_statusLabel.set_text(std::format("Error: {}", modelData.error()));
+        return;
+    }
+
+    m_model.clear();
+
+    auto error = loadModelData(modelData.value());
+    if (!error.empty()) {
+        MODELLER_VIEW_LOGGER->error("Failed to load model data: {}", error);
+        m_statusLabel.set_text(std::format("Error: {}", error));
+        return;
+    }
+
+    MODELLER_VIEW_LOGGER->info("Model loaded from: {}", path);
 }
 
 void ModellerView::onToolChanged(Tool tool)

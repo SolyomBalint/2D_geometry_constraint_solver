@@ -1,6 +1,9 @@
 #ifndef GUI_MODELLER_VIEW_HPP
 #define GUI_MODELLER_VIEW_HPP
 
+// General STD/STL headers
+#include <string>
+
 // Custom headers
 #include "./canvas.hpp"
 #include "./constraint_model.hpp"
@@ -44,6 +47,9 @@ public:
 private:
     void buildToolbar();
     void buildStatusBar();
+    void buildSidebar();
+    void refreshModelList();
+    void loadFromFile(const std::string& path);
 
     void onToolChanged(Tool tool);
     void onConstraintRequested(ElementId elemA, ElementId elemB);
@@ -69,6 +75,14 @@ private:
 
     // Action buttons
     Gtk::Button m_solveBtn;
+
+    // Sidebar layout
+    Gtk::Paned m_mainPane;
+    Gtk::Box m_sidebarBox;
+    Gtk::Label m_sidebarTitle;
+    Gtk::ScrolledWindow m_sidebarScroll;
+    Gtk::ListBox m_modelList;
+    Gtk::Box m_canvasArea;
 };
 
 } // namespace Gui
