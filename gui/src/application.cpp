@@ -42,19 +42,15 @@ void Application::loadCss()
     auto cssProvider = Gtk::CssProvider::create();
 
     // Minimal CSS for the application
-    auto cssData
-        = Glib::ustring("window { background-color: @window_bg_color; }"
-                        ".toolbar { "
-                        "  background-color: @headerbar_bg_color; "
-                        "  background-image: none; "
-                        "  border-bottom: 1px solid @borders; "
-                        "  padding: 4px; "
-                        "  opacity: 1.0; }"
-                        "drawingarea { background-color: white; }"
-                        ".solver-sidebar { "
-                        "  background-color: @window_bg_color; "
-                        "  background-image: none; "
-                        "  opacity: 1.0; }");
+    auto cssData = Glib::ustring(
+        "window { background-color: rgb(0, 0, 0); }\n" // Or your specific
+                                                       // hex/rgb
+        ".toolbar, .solver-sidebar {\n"
+        "  background-color: @window_bg_color;\n"
+        "  opacity: 1.0;\n"
+        "  background-image: none;\n"
+        "  -gtk-icon-shadow: none;\n"
+        "}");
 
     cssProvider->load_from_string(cssData);
 
