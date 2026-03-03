@@ -203,7 +203,7 @@ ConstraintGraph::getSeparatingGraphs()
         = MathUtils::findFirstSeparationPair(m_constraintGraph);
         separationPairs.has_value()) {
 
-        const auto& sepPair = separationPairs.value();
+        const auto& sepPair = separationPairs.value().value();
         std::vector<NodeIdType> splittingNodes { sepPair.a, sepPair.b };
 
         auto splitNodeSets

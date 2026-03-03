@@ -8,4 +8,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Header-only library for the graph structures
 add_library(structures INTERFACE)
-target_include_directories(structures SYSTEM INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(structures SYSTEM INTERFACE
+${CMAKE_CURRENT_SOURCE_DIR}/include ${OGDF_INCLUDE_DIRS})
+target_link_libraries(structures INTERFACE ogdf::ogdf)

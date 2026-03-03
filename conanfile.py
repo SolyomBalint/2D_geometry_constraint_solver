@@ -10,6 +10,7 @@ class ProjectRecipe(ConanFile):
         self.requires("spdlog/[~1.15]")
         self.requires("eigen/[~5]")
         self.requires("nlohmann_json/[~3.11]")
+        self.requires("ogdf/2023.09")
 
     def configure(self):
         self.options["spdlog"].use_std_fmt = True

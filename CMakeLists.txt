@@ -14,6 +14,7 @@ set(CMAKE_DEVENV_PROFILE $ENV{DEVENV_PROFILE})
 find_package(spdlog REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(OGDF REQUIRED)
 
 ######################## FetchContent dependencies ########################
 

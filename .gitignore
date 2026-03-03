@@ -53,3 +53,9 @@ opencode.json
 src/structures/build_structures
 AGENTS.md
 gui/models
+papers/
+.agents/
+GUIDELINES.md
+TODO.md
+doc/solvers_equations_heuristics.md
+
