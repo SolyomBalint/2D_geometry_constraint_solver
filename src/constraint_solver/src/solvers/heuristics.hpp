@@ -1,6 +1,10 @@
 #ifndef HEURISTICS_HPP
 #define HEURISTICS_HPP
 
+// General STD/STL headers
+#include <cmath>
+#include <optional>
+
 // Thirdparty headers
 #include <Eigen/Core>
 
@@ -118,6 +122,105 @@ inline double signedDistanceToLine(const Eigen::Vector2d& point,
         - (lineDirection.y() * pointToLineP1.x());
 
     return crossProduct / lineLength;
+}
+
+/**
+ * @brief Project a point onto the infinite line through two
+ *        endpoints.
+ *
+ * Returns the foot of the perpendicular from @p point to the
+ * line through @p lineP1 and @p lineP2. The projection is
+ * unclamped, so the foot may lie outside the @c [lineP1, lineP2]
+ * segment.
+ *
+ * @param point The point to project.
+ * @param lineP1 First endpoint defining the line.
+ * @param lineP2 Second endpoint defining the line.
+ * @return The closest point on the infinite line to @p point.
+ *
+ * @pre @p lineP1 and @p lineP2 must be distinct (non-zero line
+ *      length).
+ */
+inline Eigen::Vector2d perpendicularFoot(const Eigen::Vector2d& point,
+    const Eigen::Vector2d& lineP1, const Eigen::Vector2d& lineP2)
+{
+    Eigen::Vector2d lineDir = lineP2 - lineP1;
+    double t = lineDir.dot(point - lineP1) / lineDir.squaredNorm();
+    return lineP1 + t * lineDir;
+}
+
+/**
+ * @brief Compute the intersection of two infinite lines.
+ *
+ * Each line is defined by two endpoints. Returns @c std::nullopt
+ * if the lines are (near-)parallel.
+ *
+ * @param l1p1 First endpoint of line 1.
+ * @param l1p2 Second endpoint of line 1.
+ * @param l2p1 First endpoint of line 2.
+ * @param l2p2 Second endpoint of line 2.
+ * @return The intersection point, or @c std::nullopt if the lines
+ *         are parallel.
+ */
+inline std::optional<Eigen::Vector2d> lineLineIntersection(
+    const Eigen::Vector2d& l1p1, const Eigen::Vector2d& l1p2,
+    const Eigen::Vector2d& l2p1, const Eigen::Vector2d& l2p2)
+{
+    Eigen::Vector2d d1 = l1p2 - l1p1;
+    Eigen::Vector2d d2 = l2p2 - l2p1;
+    double cross = d1.x() * d2.y() - d1.y() * d2.x();
+
+    constexpr double PARALLEL_EPSILON = 1e-10;
+    if (std::abs(cross) < PARALLEL_EPSILON) {
+        return std::nullopt;
+    }
+
+    Eigen::Vector2d delta = l2p1 - l1p1;
+    double t = (delta.x() * d2.y() - delta.y() * d2.x()) / cross;
+    return l1p1 + t * d1;
+}
+
+/**
+ * @brief Pick the candidate whose triangle orientation matches
+ *        the canvas layout, with a collinearity fallback.
+ *
+ * When the canvas reference triangle is (near-)degenerate
+ * (collinear vertices), the orientation test cannot disambiguate.
+ * In that case, falls back to picking the candidate whose
+ * Euclidean distance to the canvas free point position is
+ * smaller.
+ *
+ * @param canvasA Canvas position of the first fixed vertex.
+ * @param canvasB Canvas position of the second fixed vertex.
+ * @param canvasFree Canvas position of the free point (sketch).
+ * @param fixedA Solver position of the first fixed vertex.
+ * @param fixedB Solver position of the second fixed vertex.
+ * @param candidate0 First Newton-Raphson solution.
+ * @param candidate1 Second Newton-Raphson solution.
+ * @return Whichever candidate preserves the canvas orientation,
+ *         or the nearest-to-canvas candidate when collinear.
+ */
+inline Eigen::Vector2d pickByTriangleOrientationWithFallback(
+    const Eigen::Vector2d& canvasA, const Eigen::Vector2d& canvasB,
+    const Eigen::Vector2d& canvasFree, const Eigen::Vector2d& fixedA,
+    const Eigen::Vector2d& fixedB, const Eigen::Vector2d& candidate0,
+    const Eigen::Vector2d& candidate1)
+{
+    constexpr double COLLINEAR_EPSILON = 1e-8;
+    double canvasOri = triangleOrientation(canvasA, canvasB, canvasFree);
+
+    if (std::abs(canvasOri) < COLLINEAR_EPSILON) {
+        // Collinear: fall back to nearest-to-canvas
+        double dist0 = (candidate0 - canvasFree).squaredNorm();
+        double dist1 = (candidate1 - canvasFree).squaredNorm();
+        return (dist0 <= dist1) ? candidate0 : candidate1;
+    }
+
+    double sol0Ori = triangleOrientation(fixedA, fixedB, candidate0);
+
+    auto sign = [](double x) { return (x > 0) - (x < 0); };
+
+    return (sign(canvasOri) == sign(sol0Ori)) ? candidate0 : candidate1;
 }
 
 /**

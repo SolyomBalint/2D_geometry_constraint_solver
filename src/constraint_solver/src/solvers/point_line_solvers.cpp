@@ -511,16 +511,22 @@ SolveResult FixedPointAndLineFreePointSolver::solve(ConstraintGraph& component)
     auto candidatePositions = Equations::solve2D(
         pointToPointDistanceEquation, pointToLineDistanceEquation);
 
-    // Disambiguate using triangle orientation with the line's
-    // midpoint as the third vertex proxy
-    Eigen::Vector2d fixedLineMidpoint = fixedLineData.midpoint();
-    Eigen::Vector2d canvasLineMidpoint
-        = (fixedLineData.canvasP1 + fixedLineData.canvasP2) / 2.0;
+    // Disambiguate using triangle orientation with the
+    // perpendicular foot of the fixed point onto the fixed line
+    // as the second vertex. This is intrinsic to the infinite
+    // line (no dependency on finite segment reconstruction) and
+    // degenerates to collinearity only when the free point lies
+    // on the true symmetry axis of the two NR solutions.
+    Eigen::Vector2d solverFoot = perpendicularFoot(
+        fixedPointData.position, fixedLineData.p1, fixedLineData.p2);
+    Eigen::Vector2d canvasFoot
+        = perpendicularFoot(fixedPointData.canvasPosition,
+            fixedLineData.canvasP1, fixedLineData.canvasP2);
 
-    auto correctResult = pickByTriangleOrientation(
-        fixedPointData.canvasPosition, canvasLineMidpoint,
-        freePointData.canvasPosition, fixedPointData.position,
-        fixedLineMidpoint, candidatePositions[0], candidatePositions[1]);
+    auto correctResult
+        = pickByTriangleOrientationWithFallback(fixedPointData.canvasPosition,
+            canvasFoot, freePointData.canvasPosition, fixedPointData.position,
+            solverFoot, candidatePositions[0], candidatePositions[1]);
 
     freePointElement->updateElementPosition(
         Eigen::Vector2d { correctResult.x(), correctResult.y() });
@@ -642,18 +648,38 @@ SolveResult TwoFixedLinesFreePointSolver::solve(ConstraintGraph& component)
     auto candidatePositions
         = Equations::solve2D(line1DistanceEquation, line2DistanceEquation);
 
-    // Disambiguate using triangle orientation with line midpoints
-    // as vertex proxies
-    Eigen::Vector2d fixedLine1Midpoint = fixedLine1Data.midpoint();
-    Eigen::Vector2d fixedLine2Midpoint = fixedLine2Data.midpoint();
-    Eigen::Vector2d canvasLine1Midpoint
-        = (fixedLine1Data.canvasP1 + fixedLine1Data.canvasP2) / 2.0;
-    Eigen::Vector2d canvasLine2Midpoint
-        = (fixedLine2Data.canvasP1 + fixedLine2Data.canvasP2) / 2.0;
+    // Disambiguate using triangle orientation built from the
+    // intersection of the two fixed lines. The intersection is
+    // intrinsic to the infinite lines (no dependency on finite
+    // segment reconstruction). A second reference point along
+    // L1's direction provides an oriented frame.
+    auto solverIntersection = lineLineIntersection(fixedLine1Data.p1,
+        fixedLine1Data.p2, fixedLine2Data.p1, fixedLine2Data.p2);
+    auto canvasIntersection
+        = lineLineIntersection(fixedLine1Data.canvasP1, fixedLine1Data.canvasP2,
+            fixedLine2Data.canvasP1, fixedLine2Data.canvasP2);
 
-    auto correctResult = pickByTriangleOrientation(canvasLine1Midpoint,
-        canvasLine2Midpoint, freePointData.canvasPosition, fixedLine1Midpoint,
-        fixedLine2Midpoint, candidatePositions[0], candidatePositions[1]);
+    Eigen::Vector2d correctResult;
+    if (solverIntersection && canvasIntersection) {
+        Eigen::Vector2d solverRefPoint
+            = *solverIntersection + fixedLine1Data.unitDirection();
+        Eigen::Vector2d canvasDir
+            = (fixedLine1Data.canvasP2 - fixedLine1Data.canvasP1).normalized();
+        Eigen::Vector2d canvasRefPoint = *canvasIntersection + canvasDir;
+
+        correctResult = pickByTriangleOrientationWithFallback(
+            *canvasIntersection, canvasRefPoint, freePointData.canvasPosition,
+            *solverIntersection, solverRefPoint, candidatePositions[0],
+            candidatePositions[1]);
+    } else {
+        // Parallel lines: fall back to nearest-to-canvas
+        double dist0 = (candidatePositions[0] - freePointData.canvasPosition)
+                           .squaredNorm();
+        double dist1 = (candidatePositions[1] - freePointData.canvasPosition)
+                           .squaredNorm();
+        correctResult
+            = (dist0 <= dist1) ? candidatePositions[0] : candidatePositions[1];
+    }
 
     freePointElement->updateElementPosition(
         Eigen::Vector2d { correctResult.x(), correctResult.y() });
