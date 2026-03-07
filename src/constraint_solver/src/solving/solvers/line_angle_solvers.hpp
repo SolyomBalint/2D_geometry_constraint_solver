@@ -2,12 +2,12 @@
 #define LINE_ANGLE_SOLVERS_HPP
 
 // Custom headers
-#include "../equations/equation_primitives.hpp"
-#include "../equations/newton_raphson.hpp"
-#include "../gcs_data_structures.hpp"
-#include "../solve_result.hpp"
-#include "./heuristics.hpp"
-#include "./subproblem_solver_concept.hpp"
+#include "model/gcs_data_structures.hpp"
+#include "model/solve_result.hpp"
+#include "solving/equations/equation_primitives.hpp"
+#include "solving/equations/newton_raphson.hpp"
+#include "solving/solvers/heuristics.hpp"
+#include "solving/solvers/subproblem_solver_concept.hpp"
 
 namespace Gcs::Solvers {
 

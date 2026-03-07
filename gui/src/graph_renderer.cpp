@@ -10,8 +10,8 @@
 #include <unordered_map>
 
 // Constraint solver headers
-#include <constraints.hpp>
-#include <elements.hpp>
+#include <model/constraints.hpp>
+#include <model/elements.hpp>
 
 namespace Gui {
 

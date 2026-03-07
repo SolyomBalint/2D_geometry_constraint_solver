@@ -7,10 +7,10 @@
 #include <unordered_map>
 
 // Constraint solver headers
-#include <component_solver.hpp>
-#include <constraints.hpp>
-#include <elements.hpp>
-#include <geometric_constraint_system.hpp>
+#include <model/constraints.hpp>
+#include <model/elements.hpp>
+#include <orchestration/geometric_constraint_system.hpp>
+#include <solving/component_solver.hpp>
 
 namespace Gui {
 

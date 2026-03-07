@@ -1,18 +1,146 @@
 #ifndef GRAPH_ALGORITHMS_HPP
 #define GRAPH_ALGORITHMS_HPP
 
+#include <array>
 #include <span>
 #include <structures/graph.hpp>
 
 #include <algorithm>
 #include <cstddef>
+#include <map>
 #include <ranges>
+#include <set>
 #include <stack>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 namespace MathUtils {
+
+template <NodeIdentity NodeId>
+struct Triangle {
+    NodeId a;
+    NodeId b;
+    NodeId c;
+};
+
+/**
+ * @brief Find all triangles in a graph using iterative DFS tree stripping.
+ *
+ * The algorithm repeatedly builds a DFS forest on the current active-edge
+ * subgraph. For each back edge @c (u,v) to an ancestor @c v, if there is an
+ * active edge between @c parent(u) and @c v, triangle @c {u,parent(u),v}
+ * exists. After each pass, all DFS tree edges are removed from the active set,
+ * and the search repeats until no active edges remain.
+ *
+ * @tparam G A type satisfying the GraphBase concept.
+ * @param graph The input graph.
+ * @return All unique triangles in canonical node order.
+ *
+ * @par Complexity
+ * O(P * (V + E)), where @c P is the number of stripping passes.
+ */
+template <GraphBase G>
+std::vector<Triangle<typename G::NodeIdType>> findTriangles(const G& graph)
+{
+    using NodeId = typename G::NodeIdType;
+    using EdgeId = typename G::EdgeIdType;
+
+    std::unordered_set<EdgeId> activeEdges;
+    for (const auto& edgeId : graph.getEdges())
+        activeEdges.insert(edgeId);
+
+    std::set<std::array<NodeId, 3>> uniqueTriangles;
+
+    while (!activeEdges.empty()) {
+        // Active adjacency lists built from the currently active edges.
+        std::unordered_map<NodeId, std::vector<EdgeId>> adjacency;
+        std::set<std::pair<NodeId, NodeId>> activeNodePairs;
+
+        for (const auto& edgeId : activeEdges) {
+            const auto [s, t] = graph.getEndpoints(edgeId);
+            adjacency[s].push_back(edgeId);
+            adjacency[t].push_back(edgeId);
+
+            if (s <= t)
+                activeNodePairs.insert({ s, t });
+            else
+                activeNodePairs.insert({ t, s });
+        }
+
+        std::unordered_set<NodeId> visited;
+        std::unordered_map<NodeId, NodeId> parent;
+        std::unordered_map<NodeId, EdgeId> parentEdge;
+        std::unordered_map<NodeId, int> depth;
+        std::unordered_set<EdgeId> treeEdges;
+
+        // DFS that collects back-edge triangles and tree edges in one pass.
+        auto dfs = [&](this auto&& self, NodeId u) -> void {
+            visited.insert(u);
+
+            if (adjacency.contains(u)) {
+                for (const auto& edgeId : adjacency.at(u)) {
+                    const auto [s, t] = graph.getEndpoints(edgeId);
+                    const auto v = (s == u) ? t : s;
+
+                    if (!visited.contains(v)) {
+                        parent[v] = u;
+                        parentEdge[v] = edgeId;
+                        depth[v] = depth[u] + 1;
+                        treeEdges.insert(edgeId);
+                        self(v);
+                        continue;
+                    }
+
+                    if (parentEdge.contains(u) && edgeId == parentEdge.at(u))
+                        continue;
+
+                    if (!depth.contains(v) || depth[v] >= depth[u])
+                        continue;
+
+                    if (!parent.contains(u))
+                        continue;
+
+                    const auto p = parent.at(u);
+                    const auto edgeKey
+                        = (p <= v) ? std::pair { p, v } : std::pair { v, p };
+                    if (!activeNodePairs.contains(edgeKey))
+                        continue;
+
+                    std::array<NodeId, 3> triangle { u, p, v };
+                    std::ranges::sort(triangle);
+                    uniqueTriangles.insert(triangle);
+                }
+            }
+        };
+
+        for (const auto& nodeId : graph.getNodes()) {
+            if (visited.contains(nodeId))
+                continue;
+
+            depth[nodeId] = 0;
+            dfs(nodeId);
+        }
+
+        if (treeEdges.empty())
+            break;
+
+        for (const auto& treeEdgeId : treeEdges)
+            activeEdges.erase(treeEdgeId);
+    }
+
+    std::vector<Triangle<NodeId>> triangles;
+    triangles.reserve(uniqueTriangles.size());
+    for (const auto& [a, b, c] : uniqueTriangles) {
+        triangles.push_back(Triangle<NodeId> {
+            .a = a,
+            .b = b,
+            .c = c,
+        });
+    }
+
+    return triangles;
+}
 
 /**
  * @brief Check whether a graph is biconnected.

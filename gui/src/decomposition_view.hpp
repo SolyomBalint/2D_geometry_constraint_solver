@@ -7,10 +7,12 @@
 // Custom headers
 #include "./constraint_model.hpp"
 #include "./decomposition_canvas.hpp"
+#include "./dr_plan_canvas.hpp"
 #include "./stree_canvas.hpp"
 
 // Constraint solver headers
-#include <gcs_data_structures.hpp>
+#include <decomposition/bottom_up/bottom_up_reducer.hpp>
+#include <model/gcs_data_structures.hpp>
 #include <structures/binary_tree.hpp>
 
 // Thirdparty headers
@@ -43,6 +45,7 @@ public:
 private:
     void buildToolbar();
     void onDecompose();
+    void onAlgorithmChanged();
     void onVisualizationChanged();
 
     ConstraintModel& m_model;
@@ -62,9 +65,11 @@ private:
     Gtk::Stack m_canvasStack;
     DecompositionCanvas m_leafCanvas;
     STreeCanvas m_streeCanvas;
+    DRPlanCanvas m_drPlanCanvas;
 
     // Stored decomposition result
     std::optional<MathUtils::BinaryTree<Gcs::ConstraintGraph>> m_lastStree;
+    std::optional<Gcs::BottomUpReductionResult> m_lastBottomUp;
 };
 
 } // namespace Gui

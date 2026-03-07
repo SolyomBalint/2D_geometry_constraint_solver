@@ -17,6 +17,8 @@ namespace Gui {
 namespace {
 
     const auto MODELLER_VIEW_LOGGER = spdlog::stdout_color_mt("MODELLER_VIEW");
+    constexpr unsigned int TOP_DOWN_STRATEGY_INDEX = 0;
+    constexpr unsigned int BOTTOM_UP_STRATEGY_INDEX = 1;
 
 } // namespace
 
@@ -131,6 +133,25 @@ void ModellerView::buildToolbar()
     auto separator
         = Gtk::make_managed<Gtk::Separator>(Gtk::Orientation::VERTICAL);
     m_toolbar.append(*separator);
+
+    // Solver strategy dropdown
+    auto strategyLabel = Gtk::make_managed<Gtk::Label>("Strategy:");
+    m_toolbar.append(*strategyLabel);
+
+    m_solverStrategyModel
+        = Gtk::StringList::create({ "Top-Down", "Bottom-Up" });
+    m_solverStrategyDropdown.set_model(m_solverStrategyModel);
+    m_solverStrategyDropdown.set_selected(
+        m_model.getSolverStrategyType() == SolverStrategyType::BottomUp
+            ? BOTTOM_UP_STRATEGY_INDEX
+            : TOP_DOWN_STRATEGY_INDEX);
+    m_solverStrategyDropdown.property_selected().signal_changed().connect(
+        sigc::mem_fun(*this, &ModellerView::onSolverStrategyChanged));
+    m_toolbar.append(m_solverStrategyDropdown);
+
+    auto strategySeparator
+        = Gtk::make_managed<Gtk::Separator>(Gtk::Orientation::VERTICAL);
+    m_toolbar.append(*strategySeparator);
 
     // Solve button
     m_solveBtn.set_label("Solve GCS");
@@ -281,6 +302,17 @@ void ModellerView::onSolveClicked()
 
     m_canvas.refreshPositionsFromModel();
     m_statusLabel.set_text("Solve completed successfully");
+}
+
+void ModellerView::onSolverStrategyChanged()
+{
+    const auto selected = m_solverStrategyDropdown.get_selected();
+    if (selected == BOTTOM_UP_STRATEGY_INDEX) {
+        m_model.setSolverStrategyType(SolverStrategyType::BottomUp);
+        return;
+    }
+
+    m_model.setSolverStrategyType(SolverStrategyType::TopDown);
 }
 
 void ModellerView::onConstraintRequested(ElementId elemA, ElementId elemB)

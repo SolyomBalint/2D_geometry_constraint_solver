@@ -58,6 +58,7 @@ private:
         ElementId elemA, ElementId elemB, double angleDegrees, bool flipped);
     void onSolveClicked();
     void onStatusChanged(const Glib::ustring& status);
+    void onSolverStrategyChanged();
 
     ConstraintModel& m_model;
     Canvas m_canvas;
@@ -75,6 +76,8 @@ private:
 
     // Action buttons
     Gtk::Button m_solveBtn;
+    Gtk::DropDown m_solverStrategyDropdown;
+    Glib::RefPtr<Gtk::StringList> m_solverStrategyModel;
 
     // Sidebar layout
     Gtk::Paned m_mainPane;

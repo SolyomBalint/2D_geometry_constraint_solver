@@ -2,11 +2,11 @@
 #define COMPONENT_SOLVER_HPP
 
 // Custom headers
-#include "./gcs_data_structures.hpp"
-#include "./solve_result.hpp"
-#include "./solvers/line_angle_solvers.hpp"
-#include "./solvers/point_line_solvers.hpp"
-#include "./solvers/point_point_solvers.hpp"
+#include "model/gcs_data_structures.hpp"
+#include "model/solve_result.hpp"
+#include "solving/solvers/line_angle_solvers.hpp"
+#include "solving/solvers/point_line_solvers.hpp"
+#include "solving/solvers/point_point_solvers.hpp"
 
 namespace Gcs {
 

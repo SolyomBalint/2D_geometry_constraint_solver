@@ -10,10 +10,11 @@
 #include <vector>
 
 // Custom headers
-#include <constraints.hpp>
-#include <elements.hpp>
-#include <gcs_data_structures.hpp>
-#include <geometric_constraint_system.hpp>
+#include <decomposition/bottom_up/bottom_up_strategy.hpp>
+#include <model/constraints.hpp>
+#include <model/elements.hpp>
+#include <model/gcs_data_structures.hpp>
+#include <orchestration/geometric_constraint_system.hpp>
 
 // Thirdparty headers
 #include <Eigen/Core>
@@ -361,8 +362,15 @@ bool ConstraintModel::isElementSolved(ElementId id) const
 std::string ConstraintModel::solveConstraintSystem()
 {
     try {
-        Gcs::GeometricConstraintSystem solver(
-            std::make_unique<Gcs::DeficitStreeBasedTopDownStrategy>());
+        std::unique_ptr<Gcs::GcsSolvingStrategy> strategy;
+        if (m_solverStrategyType == SolverStrategyType::BottomUp) {
+            strategy = std::make_unique<Gcs::BottomUpDrPlanStrategy>();
+        } else {
+            strategy
+                = std::make_unique<Gcs::DeficitStreeBasedTopDownStrategy>();
+        }
+
+        Gcs::GeometricConstraintSystem solver(std::move(strategy));
         solver.solveGeometricConstraintSystem(m_constraintGraph);
     } catch (const std::runtime_error& error) {
         return error.what();
@@ -371,6 +379,16 @@ std::string ConstraintModel::solveConstraintSystem()
     applySolverToCanvasTransform();
     notifyChange();
     return "";
+}
+
+void ConstraintModel::setSolverStrategyType(SolverStrategyType strategyType)
+{
+    m_solverStrategyType = strategyType;
+}
+
+SolverStrategyType ConstraintModel::getSolverStrategyType() const
+{
+    return m_solverStrategyType;
 }
 
 void ConstraintModel::applySolverToCanvasTransform()

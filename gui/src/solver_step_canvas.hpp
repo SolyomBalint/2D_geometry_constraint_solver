@@ -5,7 +5,7 @@
 #include <vector>
 
 // Constraint solver headers
-#include <gcs_data_structures.hpp>
+#include <model/gcs_data_structures.hpp>
 
 // Thirdparty headers
 #include <gtkmm.h>

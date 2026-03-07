@@ -5,8 +5,8 @@
 #include <concepts>
 
 // Custom headers
-#include "../gcs_data_structures.hpp"
-#include "../solve_result.hpp"
+#include "model/gcs_data_structures.hpp"
+#include "model/solve_result.hpp"
 
 namespace Gcs::Solvers {
 

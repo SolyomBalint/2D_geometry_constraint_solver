@@ -8,7 +8,7 @@
 #include "./graph_renderer.hpp"
 
 // Constraint solver headers
-#include <gcs_data_structures.hpp>
+#include <model/gcs_data_structures.hpp>
 #include <structures/binary_tree.hpp>
 
 // Thirdparty headers

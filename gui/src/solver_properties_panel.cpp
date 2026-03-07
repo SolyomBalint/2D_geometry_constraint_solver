@@ -9,9 +9,9 @@
 #include <vector>
 
 // Constraint solver headers
-#include <constraints.hpp>
-#include <elements.hpp>
-#include <solvers/heuristics.hpp>
+#include <model/constraints.hpp>
+#include <model/elements.hpp>
+#include <solving/solvers/heuristics.hpp>
 
 namespace Gui {
 

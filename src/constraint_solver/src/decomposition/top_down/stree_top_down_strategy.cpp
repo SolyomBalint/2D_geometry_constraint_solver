@@ -1,36 +1,13 @@
-#include "component_solver.hpp"
-#include "gcs_data_structures.hpp"
-#include "solve_result.hpp"
-#include <algorithm>
-#include <format>
-#include <geometric_constraint_system.hpp>
-#include <iostream>
+#include "decomposition/top_down/stree_top_down_strategy.hpp"
+
+// General STD/STL headers
 #include <ranges>
-#include <stdexcept>
-#include <structures/binary_tree.hpp>
+
+// Custom headers
+#include "solving/component_solver.hpp"
 #include <structures/separation_pairs.hpp>
-#include <vector>
 
 namespace Gcs {
-
-void GeometricConstraintSystem::solveGeometricConstraintSystem(
-    ConstraintGraph& gcs)
-{
-    if (const auto& constrainedness
-        = m_strategy->checkConstraintGraphConstrainedness(gcs);
-        constrainedness != Constrainedness::WELL_CONSTRAINED) {
-
-        if (!m_strategy->resolve(gcs)) {
-            throw std::runtime_error("Gcs is not well-constrained, current "
-                                     "algorithms do not support such inputs");
-        }
-    }
-
-    std::cerr << "Solver Called\n";
-    auto decomposition = m_strategy->decomposeConstraintGraph(gcs);
-
-    m_strategy->solveGcs(decomposition);
-}
 
 Constrainedness
 DeficitStreeBasedTopDownStrategy::checkConstraintGraphConstrainedness(
@@ -101,4 +78,4 @@ DeficitStreeBasedTopDownStrategy::getSTreeDecomposition(ConstraintGraph& gcs)
     return analysis(gcs);
 }
 
-}
+} // namespace Gcs

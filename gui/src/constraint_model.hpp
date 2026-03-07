@@ -14,9 +14,14 @@
 #include "./canvas_types.hpp"
 
 // Constraint solver headers
-#include <gcs_data_structures.hpp>
+#include <model/gcs_data_structures.hpp>
 
 namespace Gui {
+
+enum class SolverStrategyType {
+    TopDown,
+    BottomUp,
+};
 
 /**
  * @brief Bridge between the GUI canvas and the constraint solver's
@@ -187,8 +192,8 @@ public:
     /**
      * @brief Run the constraint solver on the current graph.
      *
-     * Creates a GeometricConstraintSystem with
-     * DeficitStreeBasedTopDownStrategy, solves the constraint graph,
+     * Creates a GeometricConstraintSystem with the currently selected
+     * strategy (top-down or bottom-up), solves the constraint graph,
      * then applies a rigid body (Procrustes) transform to map
      * solver-computed positions back into canvas world coordinates.
      *
@@ -196,6 +201,16 @@ public:
      *         why solving failed.
      */
     std::string solveConstraintSystem();
+
+    /**
+     * @brief Select which solver strategy to use.
+     */
+    void setSolverStrategyType(SolverStrategyType strategyType);
+
+    /**
+     * @brief Get the currently selected solver strategy.
+     */
+    [[nodiscard]] SolverStrategyType getSolverStrategyType() const;
 
     /**
      * @brief Register a callback for when the model changes.
@@ -229,6 +244,8 @@ private:
 
     ElementId m_nextElementId { 0 };
     ConstraintId m_nextConstraintId { 0 };
+
+    SolverStrategyType m_solverStrategyType { SolverStrategyType::TopDown };
 
     ChangeCallback m_changeCallback;
 };
