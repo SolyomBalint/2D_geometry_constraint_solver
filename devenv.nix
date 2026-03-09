@@ -39,20 +39,16 @@ in
     gsettings-desktop-schemas
     wrapGAppsHook4
     pkg-config
-  ];
 
-  languages.python = {
-    enable = true;
-    version = "3.14";
-    venv = {
-      enable = true;
-      requirements = ''
+    ## Python
+    (pkgs.python3.withPackages (
+      python-pkgs: with python-pkgs; [
         conan
-        conan-stubs
         mypy
-      '';
-    };
-  };
+      ]
+    ))
+    conan
+  ];
 
   enterShell = ''
     export CC=clang
