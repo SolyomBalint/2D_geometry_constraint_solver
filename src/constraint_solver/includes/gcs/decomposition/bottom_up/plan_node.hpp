@@ -1,5 +1,5 @@
-#ifndef PLAN_NODE_HPP
-#define PLAN_NODE_HPP
+#ifndef GCS_DECOMPOSITION_BOTTOM_UP_PLAN_NODE_HPP
+#define GCS_DECOMPOSITION_BOTTOM_UP_PLAN_NODE_HPP
 
 // General STD/STL headers
 #include <array>
@@ -7,7 +7,7 @@
 #include <vector>
 
 // Custom headers
-#include "cluster_types.hpp"
+#include <gcs/decomposition/bottom_up/cluster_types.hpp>
 
 namespace Gcs {
 
@@ -49,4 +49,4 @@ struct PlanNode {
 
 } // namespace Gcs
 
-#endif // PLAN_NODE_HPP
+#endif // GCS_DECOMPOSITION_BOTTOM_UP_PLAN_NODE_HPP

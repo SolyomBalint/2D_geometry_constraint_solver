@@ -14,7 +14,7 @@
 #include "./canvas_types.hpp"
 
 // Constraint solver headers
-#include <model/gcs_data_structures.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
 
 namespace Gui {
 

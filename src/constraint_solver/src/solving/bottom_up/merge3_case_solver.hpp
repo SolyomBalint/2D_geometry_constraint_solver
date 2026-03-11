@@ -8,8 +8,8 @@
 #include <unordered_map>
 
 // Custom headers
-#include "decomposition/bottom_up/plan_node.hpp"
 #include "solving/bottom_up/plan_pose_types.hpp"
+#include <gcs/decomposition/bottom_up/plan_node.hpp>
 #include <structures/general_tree.hpp>
 
 namespace Gcs::Solvers::BottomUp {

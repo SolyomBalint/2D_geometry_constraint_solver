@@ -14,8 +14,8 @@
 #include "./graph_renderer.hpp"
 
 // Constraint solver headers
-#include <decomposition/bottom_up/producer_map.hpp>
-#include <model/gcs_data_structures.hpp>
+#include <gcs/decomposition/bottom_up/producer_map.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
 
 // Thirdparty headers
 #include <gtkmm.h>

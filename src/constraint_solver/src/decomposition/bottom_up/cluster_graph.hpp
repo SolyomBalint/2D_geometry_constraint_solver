@@ -9,7 +9,7 @@
 #include <vector>
 
 // Custom headers
-#include "cluster_types.hpp"
+#include <gcs/decomposition/bottom_up/cluster_types.hpp>
 #include <structures/property_map.hpp>
 #include <structures/simple_graph.hpp>
 

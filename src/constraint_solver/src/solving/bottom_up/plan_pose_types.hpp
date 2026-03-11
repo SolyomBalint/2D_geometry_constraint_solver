@@ -9,7 +9,7 @@
 #include <Eigen/Core>
 
 // Custom headers
-#include "model/gcs_data_structures.hpp"
+#include <gcs/model/gcs_data_structures.hpp>
 
 namespace Gcs::Solvers::BottomUp {
 

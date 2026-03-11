@@ -11,8 +11,8 @@
 #include "./stree_canvas.hpp"
 
 // Constraint solver headers
-#include <decomposition/bottom_up/bottom_up_reducer.hpp>
-#include <model/gcs_data_structures.hpp>
+#include <gcs/decomposition/bottom_up/bottom_up_reducer.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
 #include <structures/binary_tree.hpp>
 
 // Thirdparty headers

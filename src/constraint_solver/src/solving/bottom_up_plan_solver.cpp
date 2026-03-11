@@ -8,8 +8,6 @@
 #include <unordered_map>
 
 // Custom headers
-#include "model/constraints.hpp"
-#include "model/elements.hpp"
 #include "solving/bottom_up/merge3_fallback_solver.hpp"
 #include "solving/bottom_up/merge3_llp_solver.hpp"
 #include "solving/bottom_up/merge3_lpp_solver.hpp"
@@ -17,6 +15,8 @@
 #include "solving/bottom_up/merge3_ppp_solver.hpp"
 #include "solving/bottom_up/merge3_solver_common.hpp"
 #include "solving/component_solver.hpp"
+#include <gcs/model/constraints.hpp>
+#include <gcs/model/elements.hpp>
 
 namespace Gcs {
 

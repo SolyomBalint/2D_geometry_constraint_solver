@@ -1,9 +1,12 @@
-#ifndef SOLVE_RESULT_HPP
-#define SOLVE_RESULT_HPP
+#ifndef GCS_MODEL_SOLVE_RESULT_HPP
+#define GCS_MODEL_SOLVE_RESULT_HPP
 
 // General STD/STL headers
 #include <string>
 #include <utility>
+
+// Custom headers
+#include <gcs/export.hpp>
 
 namespace Gcs {
 
@@ -15,7 +18,7 @@ enum class SolveStatus {
 };
 
 /// @brief Result of a subproblem solver invocation.
-struct SolveResult {
+struct GCS_API SolveResult {
     SolveStatus status;
     std::string message;
 
@@ -52,4 +55,4 @@ struct SolveResult {
 
 } // namespace Gcs
 
-#endif // SOLVE_RESULT_HPP
+#endif // GCS_MODEL_SOLVE_RESULT_HPP

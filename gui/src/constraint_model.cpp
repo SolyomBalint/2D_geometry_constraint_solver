@@ -10,11 +10,11 @@
 #include <vector>
 
 // Custom headers
-#include <decomposition/bottom_up/bottom_up_strategy.hpp>
-#include <model/constraints.hpp>
-#include <model/elements.hpp>
-#include <model/gcs_data_structures.hpp>
-#include <orchestration/geometric_constraint_system.hpp>
+#include <gcs/decomposition/bottom_up/bottom_up_strategy.hpp>
+#include <gcs/model/constraints.hpp>
+#include <gcs/model/elements.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
+#include <gcs/orchestration/geometric_constraint_system.hpp>
 
 // Thirdparty headers
 #include <Eigen/Core>

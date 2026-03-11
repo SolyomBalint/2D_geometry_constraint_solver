@@ -5,7 +5,7 @@
 #include <array>
 
 // Custom headers
-#include "plan_node.hpp"
+#include <gcs/decomposition/bottom_up/plan_node.hpp>
 #include <structures/general_tree.hpp>
 
 namespace Gcs {

@@ -23,7 +23,7 @@ target_include_directories(gcs_gui PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_link_libraries(gcs_gui PRIVATE
-    constraint_solver
+    Gcs::constraint_solver
     spdlog::spdlog
     PkgConfig::GTKMM
     Eigen3::Eigen

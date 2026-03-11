@@ -6,12 +6,13 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
-#include "./constraint_solver/src/model/constraints.hpp"
-#include "./constraint_solver/src/model/elements.hpp"
-#include "./constraint_solver/src/model/gcs_data_structures.hpp"
-#include "./constraint_solver/src/model/solve_result.hpp"
-#include "./constraint_solver/src/orchestration/geometric_constraint_system.hpp"
-#include "./constraint_solver/src/solving/component_solver.hpp"
+#include <gcs/model/constraints.hpp>
+#include <gcs/model/elements.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
+#include <gcs/model/solve_result.hpp>
+#include <gcs/orchestration/geometric_constraint_system.hpp>
+
+#include <solving/component_solver.hpp>
 
 namespace {
 // NOLINTNEXTLINE note this should be investigated

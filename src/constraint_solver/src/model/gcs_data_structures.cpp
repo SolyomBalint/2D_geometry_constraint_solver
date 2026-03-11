@@ -1,6 +1,6 @@
-#include "gcs_data_structures.hpp"
-#include "constraints.hpp"
-#include "elements.hpp"
+#include <gcs/model/constraints.hpp>
+#include <gcs/model/elements.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
 
 // General STD/STL headers
 #include <algorithm>

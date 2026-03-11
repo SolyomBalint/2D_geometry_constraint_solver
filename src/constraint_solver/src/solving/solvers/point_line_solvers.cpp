@@ -1,11 +1,11 @@
 #include "point_line_solvers.hpp"
-#include "model/constraints.hpp"
-#include "model/elements.hpp"
-#include "model/gcs_data_structures.hpp"
-#include "model/solve_result.hpp"
 #include "solving/equations/equation_primitives.hpp"
 #include "solving/equations/newton_raphson.hpp"
 #include "solving/solvers/heuristics.hpp"
+#include <gcs/model/constraints.hpp>
+#include <gcs/model/elements.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
+#include <gcs/model/solve_result.hpp>
 
 // General STD/STL headers
 #include <algorithm>

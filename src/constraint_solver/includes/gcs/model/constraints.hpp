@@ -1,5 +1,5 @@
-#ifndef CONSTRAINTS_HPP
-#define CONSTRAINTS_HPP
+#ifndef GCS_MODEL_CONSTRAINTS_HPP
+#define GCS_MODEL_CONSTRAINTS_HPP
 
 // General STD/STL headers
 #include <concepts>
@@ -7,6 +7,9 @@
 #include <memory>
 #include <string>
 #include <variant>
+
+// Custom headers
+#include <gcs/export.hpp>
 
 // Thirdparty headers
 #include <spdlog/logger.h>
@@ -33,7 +36,7 @@ concept ConstraintType = requires(T constraint) {
     } -> std::same_as<std::expected<double, ConstraintError>>;
 };
 
-struct DistanceConstraint {
+struct GCS_API DistanceConstraint {
     double distance;
 
     explicit DistanceConstraint(double d);
@@ -42,7 +45,7 @@ struct DistanceConstraint {
     std::expected<double, ConstraintError> getConstraintValue() const;
 };
 
-struct TangencyConstraint {
+struct GCS_API TangencyConstraint {
     double angle;
 
     explicit TangencyConstraint(double d);
@@ -51,7 +54,7 @@ struct TangencyConstraint {
     std::expected<double, ConstraintError> getConstraintValue() const;
 };
 
-struct AngleConstraint {
+struct GCS_API AngleConstraint {
     double angle;
     /// When true, the solver flips the orientation heuristic so the
     /// angle is enforced on the opposite side of the two lines.
@@ -63,14 +66,14 @@ struct AngleConstraint {
     std::expected<double, ConstraintError> getConstraintValue() const;
 };
 
-struct PointOnLineConstraint {
+struct GCS_API PointOnLineConstraint {
     explicit PointOnLineConstraint();
 
     std::string getTypeName() const;
     std::expected<double, ConstraintError> getConstraintValue() const;
 };
 
-struct VirtualConstraint {
+struct GCS_API VirtualConstraint {
     explicit VirtualConstraint();
 
     std::string getTypeName() const;
@@ -84,7 +87,7 @@ using ConstraintVariant
     = ConstraintInterface<DistanceConstraint, TangencyConstraint,
         AngleConstraint, PointOnLineConstraint, VirtualConstraint>;
 
-class Constraint final {
+class GCS_API Constraint final {
 private:
     ConstraintVariant m_constraint;
 
@@ -122,4 +125,4 @@ public:
 
 } // namespace Gcs
 
-#endif // CONSTRAINTS_HPP
+#endif // GCS_MODEL_CONSTRAINTS_HPP

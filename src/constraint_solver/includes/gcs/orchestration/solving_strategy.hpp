@@ -1,11 +1,12 @@
-#ifndef SOLVING_STRATEGY_HPP
-#define SOLVING_STRATEGY_HPP
+#ifndef GCS_ORCHESTRATION_SOLVING_STRATEGY_HPP
+#define GCS_ORCHESTRATION_SOLVING_STRATEGY_HPP
 
 // General STD/STL headers
 #include <vector>
 
 // Custom headers
-#include "model/gcs_data_structures.hpp"
+#include <gcs/export.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
 
 namespace Gcs {
 
@@ -16,7 +17,7 @@ enum class Constrainedness {
     INCONSISTENTLY_OVER_CONSTRAINED
 };
 
-class GcsSolvingStrategy {
+class GCS_API GcsSolvingStrategy {
 public:
     GcsSolvingStrategy() = default;
     GcsSolvingStrategy(const GcsSolvingStrategy&) = default;
@@ -41,4 +42,4 @@ public:
 
 } // namespace Gcs
 
-#endif // SOLVING_STRATEGY_HPP
+#endif // GCS_ORCHESTRATION_SOLVING_STRATEGY_HPP

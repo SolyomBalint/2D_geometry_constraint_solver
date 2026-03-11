@@ -6,8 +6,8 @@
 #include <vector>
 
 // Constraint solver headers
-#include <model/gcs_data_structures.hpp>
-#include <model/solve_result.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
+#include <gcs/model/solve_result.hpp>
 
 // Thirdparty headers
 #include <gtkmm.h>

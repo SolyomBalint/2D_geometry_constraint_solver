@@ -9,7 +9,7 @@
 
 // Custom headers
 #include "cluster_graph.hpp"
-#include "producer_map.hpp"
+#include <gcs/decomposition/bottom_up/producer_map.hpp>
 
 namespace Gcs {
 

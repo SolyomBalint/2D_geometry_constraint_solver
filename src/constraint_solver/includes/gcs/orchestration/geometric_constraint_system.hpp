@@ -1,16 +1,17 @@
-#ifndef GEOMETRIC_CONSTRAINT_SYSTEM_HPP
-#define GEOMETRIC_CONSTRAINT_SYSTEM_HPP
+#ifndef GCS_ORCHESTRATION_GEOMETRIC_CONSTRAINT_SYSTEM_HPP
+#define GCS_ORCHESTRATION_GEOMETRIC_CONSTRAINT_SYSTEM_HPP
 
 // General STD/STL headers
 #include <memory>
 
 // Custom headers
-#include "decomposition/top_down/stree_top_down_strategy.hpp"
-#include "orchestration/solving_strategy.hpp"
+#include <gcs/decomposition/top_down/stree_top_down_strategy.hpp>
+#include <gcs/export.hpp>
+#include <gcs/orchestration/solving_strategy.hpp>
 
 namespace Gcs {
 
-class GeometricConstraintSystem final {
+class GCS_API GeometricConstraintSystem final {
 public:
     void solveGeometricConstraintSystem(ConstraintGraph&);
     GeometricConstraintSystem(std::unique_ptr<GcsSolvingStrategy> strategy)
@@ -31,4 +32,4 @@ private:
 
 } // namespace Gcs
 
-#endif // GEOMETRIC_CONSTRAINT_SYSTEM_HPP
+#endif // GCS_ORCHESTRATION_GEOMETRIC_CONSTRAINT_SYSTEM_HPP

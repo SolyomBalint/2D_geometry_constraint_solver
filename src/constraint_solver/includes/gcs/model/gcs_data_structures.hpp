@@ -1,23 +1,26 @@
-#ifndef GCS_DATA_STRUCTURES_HPP
-#define GCS_DATA_STRUCTURES_HPP
+#ifndef GCS_MODEL_GCS_DATA_STRUCTURES_HPP
+#define GCS_MODEL_GCS_DATA_STRUCTURES_HPP
 
-#include "constraints.hpp"
-#include "elements.hpp"
-
+// General STD/STL headers
 #include <cstddef>
 #include <expected>
 #include <memory>
 #include <ranges>
 #include <span>
+#include <tuple>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
+// Custom headers
+#include <gcs/export.hpp>
+#include <gcs/model/constraints.hpp>
+#include <gcs/model/elements.hpp>
 #include <structures/graph.hpp>
 #include <structures/graph_errors.hpp>
 #include <structures/property_map.hpp>
 #include <structures/separation_pairs.hpp>
 #include <structures/simple_graph.hpp>
-#include <tuple>
-#include <unordered_set>
-#include <utility>
-#include <vector>
 
 namespace Gcs {
 
@@ -25,7 +28,7 @@ enum class ConstraintGraphError { OK, NodeNotFound, EdgeNotFound };
 
 struct SeparationGraphInfo;
 
-class ConstraintGraph final {
+class GCS_API ConstraintGraph final {
 public:
     using Graph = MathUtils::SimpleGraph;
     using NodeIdType = Graph::NodeIdType;
@@ -144,7 +147,7 @@ private:
     std::unordered_set<EdgeIdType> m_virtualEdges;
 };
 
-struct SeparationGraphInfo {
+struct GCS_API SeparationGraphInfo {
     ConstraintGraph separtionGraph;
     std::pair<ConstraintGraph::NodeIdType, ConstraintGraph::NodeIdType>
         originalToNewSepNodeA;
@@ -154,4 +157,4 @@ struct SeparationGraphInfo {
 
 } // namespace Gcs
 
-#endif
+#endif // GCS_MODEL_GCS_DATA_STRUCTURES_HPP

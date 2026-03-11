@@ -6,7 +6,7 @@
 
 // Custom headers
 #include "cluster_graph.hpp"
-#include "model/gcs_data_structures.hpp"
+#include <gcs/model/gcs_data_structures.hpp>
 
 namespace Gcs {
 

@@ -2,12 +2,13 @@
 #define POINT_LINE_SOLVERS_HPP
 
 // Custom headers
-#include "model/gcs_data_structures.hpp"
-#include "model/solve_result.hpp"
 #include "solving/equations/equation_primitives.hpp"
 #include "solving/equations/newton_raphson.hpp"
 #include "solving/solvers/heuristics.hpp"
 #include "solving/solvers/subproblem_solver_concept.hpp"
+#include <gcs/export.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
+#include <gcs/model/solve_result.hpp>
 
 namespace Gcs::Solvers {
 
@@ -30,7 +31,7 @@ namespace Gcs::Solvers {
  * - 3 edges: all DistanceConstraints, no virtual edges
  * - 1 point-to-point distance, 2 point-to-line distances
  */
-struct ZeroFixedPPLTriangleSolver {
+struct GCS_API ZeroFixedPPLTriangleSolver {
 
     /**
      * @brief Check whether a component matches this solver.
@@ -76,7 +77,7 @@ static_assert(SubproblemSolver<ZeroFixedPPLTriangleSolver>);
  * - At least 2 non-virtual DistanceConstraint edges from points
  *   to line; virtual edge between the two points
  */
-struct TwoFixedPointsLineSolver {
+struct GCS_API TwoFixedPointsLineSolver {
 
     /**
      * @brief Check whether a component matches this solver.
@@ -115,7 +116,7 @@ static_assert(SubproblemSolver<TwoFixedPointsLineSolver>);
  *   the free point to the solved elements; virtual edge between
  *   the solved point and the solved line
  */
-struct FixedPointAndLineFreePointSolver {
+struct GCS_API FixedPointAndLineFreePointSolver {
 
     /**
      * @brief Check whether a component matches this solver.
@@ -154,7 +155,7 @@ static_assert(SubproblemSolver<FixedPointAndLineFreePointSolver>);
  * - 2 non-virtual DistanceConstraint edges from point to each
  *   line; virtual edge between the two lines
  */
-struct TwoFixedLinesFreePointSolver {
+struct GCS_API TwoFixedLinesFreePointSolver {
 
     /**
      * @brief Check whether a component matches this solver.

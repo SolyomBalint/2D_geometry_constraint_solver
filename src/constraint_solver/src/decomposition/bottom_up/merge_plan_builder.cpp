@@ -7,7 +7,7 @@
 #include <cstddef>
 
 // Custom headers
-#include "cluster_types.hpp"
+#include <gcs/decomposition/bottom_up/cluster_types.hpp>
 
 namespace Gcs {
 

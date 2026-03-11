@@ -11,8 +11,8 @@
 #include <Eigen/Core>
 
 // Custom headers
-#include "model/elements.hpp"
 #include "solving/bottom_up/plan_pose_types.hpp"
+#include <gcs/model/elements.hpp>
 
 namespace Gcs::Solvers::BottomUp {
 

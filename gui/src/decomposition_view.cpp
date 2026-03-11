@@ -7,7 +7,7 @@
 #include <string>
 
 // Constraint solver headers
-#include <decomposition/top_down/stree_top_down_strategy.hpp>
+#include <gcs/decomposition/top_down/stree_top_down_strategy.hpp>
 
 namespace Gui {
 

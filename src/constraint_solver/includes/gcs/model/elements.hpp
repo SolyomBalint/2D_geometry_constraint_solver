@@ -1,11 +1,14 @@
-#ifndef ELEMENTS_HPP
-#define ELEMENTS_HPP
+#ifndef GCS_MODEL_ELEMENTS_HPP
+#define GCS_MODEL_ELEMENTS_HPP
 
 // General STD/STL headers
 #include <cassert>
 #include <concepts>
 #include <string>
 #include <variant>
+
+// Custom headers
+#include <gcs/export.hpp>
 
 // Thirdparty headers
 #include <Eigen/Core>
@@ -18,7 +21,7 @@ concept ElementType = requires(T element) {
     { element.toString() } -> std::convertible_to<std::string>;
 };
 
-struct Point {
+struct GCS_API Point {
     Eigen::Vector2d canvasPosition; ///< Original position on canvas.
     Eigen::Vector2d position; ///< Solver-calculated position.
 
@@ -30,7 +33,7 @@ struct Point {
     void updateElementPosition(const Eigen::Vector2d& newPosition);
 };
 
-struct FixedRadiusCircle {
+struct GCS_API FixedRadiusCircle {
     Eigen::Vector2d position; ///< Center position.
     double fixedRadius;
 
@@ -42,7 +45,7 @@ struct FixedRadiusCircle {
     void updateElementPosition(const Eigen::Vector2d& newPosition);
 };
 
-struct Line {
+struct GCS_API Line {
     Eigen::Vector2d canvasP1; ///< Original canvas endpoint 1.
     Eigen::Vector2d canvasP2; ///< Original canvas endpoint 2.
     Eigen::Vector2d p1; ///< Solver-calculated endpoint 1.
@@ -95,7 +98,7 @@ using ElementInterface = std::variant<Types...>;
 
 using ElementVariant = ElementInterface<Point, FixedRadiusCircle, Line>;
 
-class Element final {
+class GCS_API Element final {
 private:
     ElementVariant m_element;
     bool m_isSet = false;
@@ -153,6 +156,7 @@ public:
             m_element);
     }
 };
+
 } // namespace Gcs
 
-#endif // ELEMENTS_HPP
+#endif // GCS_MODEL_ELEMENTS_HPP

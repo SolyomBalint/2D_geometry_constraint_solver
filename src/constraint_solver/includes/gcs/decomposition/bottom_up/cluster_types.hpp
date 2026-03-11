@@ -1,5 +1,5 @@
-#ifndef CLUSTER_TYPES_HPP
-#define CLUSTER_TYPES_HPP
+#ifndef GCS_DECOMPOSITION_BOTTOM_UP_CLUSTER_TYPES_HPP
+#define GCS_DECOMPOSITION_BOTTOM_UP_CLUSTER_TYPES_HPP
 
 // General STD/STL headers
 #include <algorithm>
@@ -15,7 +15,7 @@
 #include <vector>
 
 // Custom headers
-#include "model/gcs_data_structures.hpp"
+#include <gcs/model/gcs_data_structures.hpp>
 
 namespace Gcs {
 
@@ -133,4 +133,4 @@ struct std::hash<Gcs::ClusterId> {
     }
 };
 
-#endif // CLUSTER_TYPES_HPP
+#endif // GCS_DECOMPOSITION_BOTTOM_UP_CLUSTER_TYPES_HPP

@@ -1,4 +1,4 @@
-#include "constraints.hpp"
+#include <gcs/model/constraints.hpp>
 
 namespace Gcs {
 

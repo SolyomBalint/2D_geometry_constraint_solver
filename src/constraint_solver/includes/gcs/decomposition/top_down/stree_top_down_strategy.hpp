@@ -1,17 +1,18 @@
-#ifndef STREE_TOP_DOWN_STRATEGY_HPP
-#define STREE_TOP_DOWN_STRATEGY_HPP
+#ifndef GCS_DECOMPOSITION_TOP_DOWN_STREE_TOP_DOWN_STRATEGY_HPP
+#define GCS_DECOMPOSITION_TOP_DOWN_STREE_TOP_DOWN_STRATEGY_HPP
 
 // General STD/STL headers
 #include <vector>
 
 // Custom headers
-#include "model/gcs_data_structures.hpp"
-#include "orchestration/solving_strategy.hpp"
+#include <gcs/export.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
+#include <gcs/orchestration/solving_strategy.hpp>
 #include <structures/binary_tree.hpp>
 
 namespace Gcs {
 
-class DeficitStreeBasedTopDownStrategy : public GcsSolvingStrategy {
+class GCS_API DeficitStreeBasedTopDownStrategy : public GcsSolvingStrategy {
 public:
     Constrainedness checkConstraintGraphConstrainedness(
         const ConstraintGraph& gcs) override;
@@ -31,4 +32,4 @@ public:
 
 } // namespace Gcs
 
-#endif // STREE_TOP_DOWN_STRATEGY_HPP
+#endif // GCS_DECOMPOSITION_TOP_DOWN_STREE_TOP_DOWN_STRATEGY_HPP

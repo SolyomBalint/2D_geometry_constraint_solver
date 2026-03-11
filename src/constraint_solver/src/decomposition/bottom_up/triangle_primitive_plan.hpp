@@ -2,7 +2,7 @@
 #define TRIANGLE_PRIMITIVE_PLAN_HPP
 
 // Custom headers
-#include "plan_node.hpp"
+#include <gcs/decomposition/bottom_up/plan_node.hpp>
 #include <structures/general_tree.hpp>
 #include <structures/graph_algorithms.hpp>
 

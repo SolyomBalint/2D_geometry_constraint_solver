@@ -2,12 +2,13 @@
 #define LINE_ANGLE_SOLVERS_HPP
 
 // Custom headers
-#include "model/gcs_data_structures.hpp"
-#include "model/solve_result.hpp"
 #include "solving/equations/equation_primitives.hpp"
 #include "solving/equations/newton_raphson.hpp"
 #include "solving/solvers/heuristics.hpp"
 #include "solving/solvers/subproblem_solver_concept.hpp"
+#include <gcs/export.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
+#include <gcs/model/solve_result.hpp>
 
 namespace Gcs::Solvers {
 
@@ -41,7 +42,7 @@ namespace Gcs::Solvers {
  * - 3 edges: exactly 1 AngleConstraint (between the two Lines)
  *   and 2 DistanceConstraints (Point to each Line)
  */
-struct ZeroFixedLLPAngleTriangleSolver {
+struct GCS_API ZeroFixedLLPAngleTriangleSolver {
 
     /**
      * @brief Check whether a component matches this solver.
@@ -95,7 +96,7 @@ static_assert(SubproblemSolver<ZeroFixedLLPAngleTriangleSolver>);
  *   two Lines) and 1 DistanceConstraint (Point to free Line)
  * - Virtual edge between the solved Line and solved Point
  */
-struct FixedLineAndPointFreeLineSolver {
+struct GCS_API FixedLineAndPointFreeLineSolver {
 
     /**
      * @brief Check whether a component matches this solver.

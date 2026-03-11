@@ -1,4 +1,4 @@
-#include "bottom_up_reducer.hpp"
+#include <gcs/decomposition/bottom_up/bottom_up_reducer.hpp>
 
 // General STD/STL headers
 #include <algorithm>

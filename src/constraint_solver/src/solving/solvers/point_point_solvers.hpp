@@ -2,12 +2,13 @@
 #define POINT_POINT_SOLVERS_HPP
 
 // Custom headers
-#include "model/gcs_data_structures.hpp"
-#include "model/solve_result.hpp"
 #include "solving/equations/equation_primitives.hpp"
 #include "solving/equations/newton_raphson.hpp"
 #include "solving/solvers/heuristics.hpp"
 #include "solving/solvers/subproblem_solver_concept.hpp"
+#include <gcs/export.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
+#include <gcs/model/solve_result.hpp>
 
 namespace Gcs::Solvers {
 
@@ -22,7 +23,7 @@ namespace Gcs::Solvers {
  * - 3 nodes, all Points, all unsolved
  * - 3 edges, all DistanceConstraints, no virtual edges
  */
-struct ZeroFixedPointsTriangleSolver {
+struct GCS_API ZeroFixedPointsTriangleSolver {
 
     /**
      * @brief Check whether a component matches this solver.
@@ -61,7 +62,7 @@ static_assert(SubproblemSolver<ZeroFixedPointsTriangleSolver>);
  * - At least 2 non-virtual DistanceConstraint edges connecting
  *   the unsolved point to the two solved points
  */
-struct TwoFixedPointsDistanceSolver {
+struct GCS_API TwoFixedPointsDistanceSolver {
 
     /**
      * @brief Check whether a component matches this solver.

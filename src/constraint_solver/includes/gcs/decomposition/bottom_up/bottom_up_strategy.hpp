@@ -1,14 +1,15 @@
-#ifndef BOTTOM_UP_STRATEGY_HPP
-#define BOTTOM_UP_STRATEGY_HPP
+#ifndef GCS_DECOMPOSITION_BOTTOM_UP_BOTTOM_UP_STRATEGY_HPP
+#define GCS_DECOMPOSITION_BOTTOM_UP_BOTTOM_UP_STRATEGY_HPP
 
 // General STD/STL headers
 #include <optional>
 #include <vector>
 
 // Custom headers
-#include "decomposition/bottom_up/bottom_up_reducer.hpp"
-#include "model/gcs_data_structures.hpp"
-#include "orchestration/solving_strategy.hpp"
+#include <gcs/decomposition/bottom_up/bottom_up_reducer.hpp>
+#include <gcs/export.hpp>
+#include <gcs/model/gcs_data_structures.hpp>
+#include <gcs/orchestration/solving_strategy.hpp>
 
 namespace Gcs {
 
@@ -19,7 +20,7 @@ namespace Gcs {
  * Bottom-up decomposition artifacts are stored as strategy state and can be
  * queried after decomposition.
  */
-class BottomUpDrPlanStrategy : public GcsSolvingStrategy {
+class GCS_API BottomUpDrPlanStrategy : public GcsSolvingStrategy {
 public:
     Constrainedness checkConstraintGraphConstrainedness(
         const ConstraintGraph& gcs) override;
@@ -57,4 +58,4 @@ private:
 
 } // namespace Gcs
 
-#endif // BOTTOM_UP_STRATEGY_HPP
+#endif // GCS_DECOMPOSITION_BOTTOM_UP_BOTTOM_UP_STRATEGY_HPP

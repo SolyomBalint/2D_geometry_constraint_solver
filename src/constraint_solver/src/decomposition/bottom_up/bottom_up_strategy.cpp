@@ -1,4 +1,4 @@
-#include "decomposition/bottom_up/bottom_up_strategy.hpp"
+#include <gcs/decomposition/bottom_up/bottom_up_strategy.hpp>
 
 // General STD/STL headers
 #include <stdexcept>
