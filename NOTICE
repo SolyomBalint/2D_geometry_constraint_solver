@@ -49,15 +49,7 @@ Core Dependencies (from conanfile.py)
    License: MIT
    Website: https://github.com/gabime/spdlog
 
-4. stduuid - v1.2.x
-   License: MIT
-   Website: https://github.com/mariusbancila/stduuid
-
-5. argparse - v3.2
-   License: MIT
-   Website: https://github.com/p-ranav/argparse
-
-6. nlohmann_json - v3.11.3
+3. nlohmann_json - v3.11.3
    License: MIT
    Website: https://github.com/nlohmann/json
 
@@ -65,34 +57,6 @@ Core Dependencies (from conanfile.py)
    License: MIT
    Copyright: Allan Leal (2018-2024)
    Website: https://github.com/autodiff/autodiff
-
-8. nanobind (Python bindings)
-   License: BSD-3-Clause
-   Website: https://github.com/wjakob/nanobind
-
-
-Transitive Dependencies
-------------------------
-
-The following libraries are transitive dependencies (dependencies of dependencies):
-
-1. COIN-OR Libraries (CoinUtils, Clp, Osi)
-   License: Eclipse Public License 2.0 (EPL-2.0)
-   Website: https://www.coin-or.org/
-   Note: Used by OGDF
-
-2. pugixml
-   License: MIT
-   Website: https://pugixml.org/
-
-3. zlib
-   License: Zlib License
-   Website: https://www.zlib.net/
-
-4. bzip2
-   License: bzip2-1.0.6
-   Website: https://sourceware.org/bzip2/
-
 
 Build Tool Dependencies
 -----------------------
@@ -123,10 +87,6 @@ The majority of other dependencies use permissive licenses (MIT, BSD, Apache, et
 which are compatible with the GPL.
 
 Eigen uses MPL-2.0, which is a weak copyleft license and is also compatible with GPL.
-
-COIN-OR uses EPL-2.0, which is compatible with GPL as per the Eclipse Foundation's
-compatibility statement.
-
 
 Full License Text
 =================
